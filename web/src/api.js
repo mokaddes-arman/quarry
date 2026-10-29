@@ -47,6 +47,7 @@ async function request(path, { method = 'GET', body, headers, signal } = {}) {
   });
   const data = await parse(res);
   if (!res.ok) {
+    if (res.status === 401) window.dispatchEvent(new CustomEvent('rag:unauthorized'));
     throw new ApiError(data?.error?.message || `Request failed (${res.status})`, {
       status: res.status,
       code: data?.error?.code,
@@ -63,11 +64,30 @@ async function upload(path, fileOrFiles) {
   const files = Array.isArray(fileOrFiles) ? fileOrFiles : [fileOrFiles];
   for (const f of files) fd.append('files', f);
   const res = await fetch(BASE + path, { method: 'POST', body: fd });
+  if (res.status === 401) window.dispatchEvent(new CustomEvent('rag:unauthorized'));
   const data = await parse(res);
   return { status: res.status, ok: res.ok, body: data };
 }
 
 export const api = {
+  // --- authentication ---------------------------------------------------------
+  authStatus: () => request('/auth/status'),
+  me: () => request('/auth/me'),
+  requestLoginLink: (email) => request('/auth/request-link', { method: 'POST', body: { email } }),
+  verifyLogin: (token) => request('/auth/verify', { method: 'POST', body: { token } }),
+  logout: () => request('/auth/logout', { method: 'POST' }),
+  setupAdmin: (body) => request('/auth/setup', { method: 'POST', body }),
+
+  // --- administration ---------------------------------------------------------
+  adminOverview: () => request('/admin/overview'),
+  adminListUsers: (params) => request(`/admin/users${qs(params)}`),
+  adminCreateUser: (body) => request('/admin/users', { method: 'POST', body }),
+  adminUpdateUser: (id, body) => request(`/admin/users/${id}`, { method: 'PATCH', body }),
+  adminResendInvite: (id) => request(`/admin/users/${id}/resend`, { method: 'POST' }),
+  adminRevokeSessions: (id) => request(`/admin/users/${id}/sessions`, { method: 'DELETE' }),
+  adminDeleteUser: (id, reassignTo) =>
+    request(`/admin/users/${id}${qs({ reassign: reassignTo, confirm: 'yes' })}`, { method: 'DELETE' }),
+
   // --- system -----------------------------------------------------------------
   health: () => request('/health'),
   systemStatus: () => request('/system/status'),
@@ -225,6 +245,7 @@ export async function askStream(
     });
 
     if (!res.ok || !res.body) {
+      if (res.status === 401) window.dispatchEvent(new CustomEvent('rag:unauthorized'));
       const data = await parse(res);
       throw new ApiError(data?.error?.message || `Request failed (${res.status})`, {
         status: res.status,

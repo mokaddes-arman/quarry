@@ -84,13 +84,50 @@ const forced = {
   CHUNK_SIZE_CHARS: '800',
   CHUNK_OVERLAP_CHARS: '100',
   MAX_UPLOAD_SIZE_MB: '20',
+  // First-run administrator. The bootstrap also writes a ready-made session for
+  // Playwright below, so every test starts signed in without going through the
+  // email flow.
+  ADMIN_EMAIL: 'e2e-admin@example.test',
+  ADMIN_NAME: 'E2E Admin',
+  APP_PUBLIC_URL: `http://127.0.0.1:${port}`,
 };
 for (const [key, value] of Object.entries(forced)) process.env[key] = value;
 
 // --- 4. Boot the real API (it serves web/dist on the same origin) ------------
 log(`starting API on http://127.0.0.1:${port} (database: embedded PGlite, embeddings: hash, LLM: mock)`);
 const { bootstrap } = require('../server/src/index.js');
-bootstrap().catch((err) => {
-  log(`server failed to start: ${err && err.stack ? err.stack : err}`);
-  process.exit(1);
-});
+bootstrap()
+  .then(async () => {
+    // Everything below runs after migrations, so the first administrator exists.
+    // Create a real session through the normal token flow and hand it to
+    // Playwright (globalSetup waits for this file) and to the API helpers.
+    const { writeFileSync } = require('node:fs');
+    const { query } = require('../server/src/db');
+    const users = require('../server/src/services/users');
+
+    const { rows } = await query(
+      "SELECT id FROM users WHERE email_normalised = 'e2e-admin@example.test' LIMIT 1",
+    );
+    if (!rows[0]) throw new Error('e2e administrator was not created');
+
+    const link = await users.issueLoginToken({ userId: rows[0].id, purpose: 'login' });
+    const verified = await users.verifyLoginToken(link.token);
+    const sessionFile = path.join(e2eDir, 'session.json');
+    writeFileSync(
+      sessionFile,
+      JSON.stringify(
+        {
+          userId: rows[0].id,
+          token: verified.sessionToken,
+          expiresAt: verified.sessionExpiresAt,
+        },
+        null,
+        2,
+      ),
+    );
+    log('e2e administrator session written');
+  })
+  .catch((err) => {
+    log(`server failed to start: ${err && err.stack ? err.stack : err}`);
+    process.exit(1);
+  });

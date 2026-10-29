@@ -16,6 +16,7 @@ const baseURL = `http://127.0.0.1:${PORT}`;
  */
 module.exports = defineConfig({
   testDir: './e2e',
+  globalSetup: require.resolve('./e2e/global-setup.js'),
   timeout: 120_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,
@@ -25,6 +26,8 @@ module.exports = defineConfig({
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL,
+    // Written by e2e/global-setup.js from the session the backend creates at boot.
+    storageState: require('node:path').resolve(__dirname, 'storage', '.e2e', 'state.json'),
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'off',

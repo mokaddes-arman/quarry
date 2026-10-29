@@ -90,3 +90,22 @@ export const CrawlIcon = (p) => (
 export const AttachmentIcon = (p) => (
   <Icon {...p} path={<path d="M21.4 11.05l-8.5 8.5a5.5 5.5 0 01-7.78-7.78l8.5-8.5a3.67 3.67 0 015.18 5.18l-8.5 8.5a1.83 1.83 0 01-2.59-2.6l7.86-7.85" />} />
 );
+
+export const Spinner = ({ className = 'h-5 w-5' }) => (
+  <svg className={`${className} animate-spin`} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.2" strokeWidth="3" />
+    <path d="M21 12a9 9 0 00-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+  </svg>
+);
+export const UsersIcon = (p) => (
+  <Icon {...p} path={<><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" /></>} />
+);
+export const LogoutIcon = (p) => (
+  <Icon {...p} path={<><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" /><path d="M16 17l5-5-5-5" /><path d="M21 12H9" /></>} />
+);
+export const MailIcon = (p) => (
+  <Icon {...p} path={<><rect x="2" y="4" width="20" height="16" rx="2" /><path d="M22 7l-10 6L2 7" /></>} />
+);
+export const ShieldIcon = (p) => (
+  <Icon {...p} path={<><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="M9 12l2 2 4-4" /></>} />
+);

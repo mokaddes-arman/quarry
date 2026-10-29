@@ -94,6 +94,54 @@ async function main() {
     fail(`core tables are missing or unreadable: ${err.message}. Run \`npm run db:migrate\`.`);
   }
 
+  // --- hosted Postgres / Supabase lockdown ---------------------------------
+  // Supabase grants `anon` and `authenticated` access to public tables and
+  // exposes them over PostgREST. The app connects directly as the table owner
+  // and never needs those roles, so any remaining grant (or a table without
+  // RLS) is a data leak waiting to happen.
+  try {
+    const { rows: roles } = await query(
+      `SELECT rolname FROM pg_roles WHERE rolname IN ('anon', 'authenticated') ORDER BY rolname`,
+    );
+    if (!roles.length) {
+      info('REST-exposure lockdown: not applicable (no anon/authenticated roles on this database)');
+    } else {
+      const roleList = roles.map((r) => r.rolname);
+      const { rows: tableGrants } = await query(
+        `SELECT c.relname AS name FROM pg_class c
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+         WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p')
+           AND EXISTS (
+             SELECT 1 FROM unnest($1::text[]) AS t(role)
+             WHERE has_table_privilege(t.role, c.oid, 'SELECT,INSERT,UPDATE,DELETE')
+           )
+         ORDER BY c.relname LIMIT 10`,
+        [roleList],
+      );
+      const { rows: openRls } = await query(
+        `SELECT c.relname AS name FROM pg_class c
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+         WHERE n.nspname = 'public' AND c.relkind = 'r' AND NOT c.relrowsecurity
+         ORDER BY c.relname LIMIT 10`,
+      );
+
+      if (tableGrants.length) {
+        fail(
+          `anon/authenticated still have table privileges (${tableGrants.map((t) => t.name).join(', ')}). Run migration 007 again.`,
+        );
+      } else {
+        ok('anon/authenticated have no privileges on public tables');
+      }
+      if (openRls.length) {
+        fail(`row level security is disabled on: ${openRls.map((t) => t.name).join(', ')}. Run migration 007 again.`);
+      } else {
+        ok('row level security is enabled on every public table');
+      }
+    }
+  } catch (err) {
+    warn(`could not verify the REST-exposure lockdown: ${err.message}`);
+  }
+
   // --- master key -----------------------------------------------------------
   if (getMasterKey()) ok('APP_MASTER_KEY is configured (provider keys can be encrypted)');
   else warn('APP_MASTER_KEY is not set — saving a provider configuration will fail until it is.');

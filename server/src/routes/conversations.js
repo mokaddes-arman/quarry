@@ -5,8 +5,20 @@ const { z } = require('zod');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { validateBody, validateQuery, validateUuidParam } = require('../middleware/validate');
 const conversations = require('../services/conversations');
+const access = require('../services/access');
 
 const router = express.Router();
+
+// Every /:id route below is a conversation; resolve it within the caller's
+// project scope before any handler runs.
+router.param('id', async (req, _res, next, id) => {
+  try {
+    req.conversation = await access.assertOwned('conversation', req.user, id);
+    return next();
+  } catch (err) {
+    return next(err);
+  }
+});
 
 const retrievalSchema = z
   .object({
@@ -33,6 +45,7 @@ const askSchema = z.object({
 router.post(
   '/projects/:projectId/conversations',
   validateUuidParam('projectId'),
+  access.requireProjectAccess('projectId'),
   validateBody(
     z.object({
       title: z.string().trim().max(200).optional(),
@@ -95,12 +108,14 @@ router.post(
   asyncHandler(async (req, res) => {
     const body = req.validated;
     const wantsStream = body.stream !== false && req.get('accept') !== 'application/json';
+    // Cross-project search is limited to the projects this user may read.
+    const allowedProjectIds = await access.allowedProjectIds(req.user);
 
     if (!wantsStream) {
       const result = await conversations.ask({
         conversationId: req.params.id,
         question: body.question,
-        options: { ...body, stream: false },
+        options: { ...body, stream: false, allowedProjectIds },
       });
       return res.json({ result });
     }
@@ -137,7 +152,7 @@ router.post(
       const result = await conversations.ask({
         conversationId: req.params.id,
         question: body.question,
-        options: { ...body, stream: true },
+        options: { ...body, stream: true, allowedProjectIds },
         emit,
         signal: controller.signal,
       });
@@ -164,11 +179,16 @@ router.post(
     }),
   ),
   asyncHandler(async (req, res) => {
-    const conversation = await conversations.getConversation(req.params.id, { includeSources: false });
+    const conversation = req.conversation;
     const result = await conversations.retrieveEvidence({
       projectId: conversation.project_id,
       question: req.validated.question,
-      options: { crossProject: req.validated.crossProject, projectIds: req.validated.projectIds, retrieval: req.validated.retrieval },
+      options: {
+        crossProject: req.validated.crossProject,
+        projectIds: req.validated.projectIds,
+        retrieval: req.validated.retrieval,
+        allowedProjectIds: await access.allowedProjectIds(req.user),
+      },
     });
     res.json({ sources: result.sources, stats: result.stats });
   }),

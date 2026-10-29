@@ -2,13 +2,15 @@ import { Component, useState } from 'react';
 import { useApp } from './store';
 import { Sidebar } from './components/Sidebar';
 import { Button, EmptyState, Field, Input, Modal } from './components/ui';
-import { MenuIcon, PlusIcon, AlertIcon } from './components/icons';
+import { MenuIcon, PlusIcon, AlertIcon, Spinner } from './components/icons';
 import { ChatView } from './views/ChatView';
 import { DocumentsView } from './views/DocumentsView';
 import { SearchView } from './views/SearchView';
 import { DashboardView } from './views/DashboardView';
 import { SettingsView } from './views/SettingsView';
 import { ModelUsageView } from './views/ModelUsageView';
+import { AdminView } from './views/AdminView';
+import { LoginView } from './views/LoginView';
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -108,19 +110,20 @@ function FirstProjectScreen() {
 }
 
 function Main() {
-  const { view, projects, projectsLoading, sidebarOpen, setSidebarOpen, activeProject } = useApp();
+  const { view, isAdmin, projects, projectsLoading, sidebarOpen, setSidebarOpen, activeProject } = useApp();
 
   // Views that make sense with no project at all.
-  const globalView = view === 'settings' || view === 'model-usage';
+  const globalView = view === 'settings' || view === 'model-usage' || view === 'admin';
   const showFirstProject = !projectsLoading && projects.length === 0 && !globalView;
 
   let content;
-  if (showFirstProject) content = <FirstProjectScreen />;
+  if (view === 'admin' && isAdmin) content = <AdminView />;
+  else if (showFirstProject) content = <FirstProjectScreen />;
   else if (view === 'documents') content = <DocumentsView />;
   else if (view === 'search') content = <SearchView />;
   else if (view === 'dashboard') content = <DashboardView />;
-  else if (view === 'model-usage') content = <ModelUsageView />;
-  else if (view === 'settings') content = <SettingsView />;
+  else if (view === 'model-usage' && isAdmin) content = <ModelUsageView />;
+  else if (view === 'settings' && isAdmin) content = <SettingsView />;
   else content = <ChatView />;
 
   return (
@@ -152,5 +155,20 @@ function Main() {
 }
 
 export function App() {
+  const { authLoading, user } = useApp();
+
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-100 text-slate-500 dark:bg-slate-950 dark:text-slate-400">
+        <div className="flex flex-col items-center gap-3">
+          <Spinner className="h-6 w-6" />
+          <p className="text-sm">Loading workspace…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) return <LoginView />;
+
   return <Main />;
 }

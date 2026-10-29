@@ -9,7 +9,10 @@ const { config } = require('./config/env');
 const { logger } = require('./lib/logger');
 const { requestContext } = require('./middleware/requestContext');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
+const { authenticate, requireAuth, csrfGuard } = require('./middleware/auth');
 
+const authRoutes = require('./routes/auth');
+const adminRoutes = require('./routes/admin');
 const healthRoutes = require('./routes/health');
 const projectRoutes = require('./routes/projects');
 const documentRoutes = require('./routes/documents');
@@ -19,10 +22,14 @@ const providerRoutes = require('./routes/providers');
 const settingsRoutes = require('./routes/settings');
 const usageRoutes = require('./routes/usage');
 
-function createApp() {
+function createApp({ testAuth = false, testAuthUserId = null } = {}) {
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', false);
+  // Only ever set by the integration-test helper (config.isTest is also checked
+  // before this is honoured). Never enabled by the application itself.
+  app.set('testAuth', Boolean(testAuth) && config.isTest);
+  app.set('testAuthUserId', testAuthUserId);
 
   // Narrow CORS: only the configured dev/preview origins may call the API.
   const allowed = new Set(config.corsOrigins);
@@ -33,9 +40,9 @@ function createApp() {
         if (allowed.has(origin)) return callback(null, true);
         return callback(null, false);
       },
-      credentials: false,
+      credentials: true,
       methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['content-type', 'authorization', 'x-request-id', 'accept'],
+      allowedHeaders: ['content-type', 'authorization', 'x-request-id', 'accept', 'x-test-user'],
     }),
   );
 
@@ -63,7 +70,15 @@ function createApp() {
 
   // Routers define their own full sub-paths, except the projects router whose
   // routes are relative to the project collection (`/`, `/:id`, `/:id/...`).
+  //
+  // Public surface: health probes and the auth endpoints (setup / request a
+  // link / verify / logout). Everything below `requireAuth` needs a session.
+  app.use('/api', authenticate);
+  app.use('/api', csrfGuard);
   app.use('/api', healthRoutes);
+  app.use('/api', authRoutes);
+  app.use('/api', requireAuth);
+  app.use('/api', adminRoutes);
   app.use('/api', providerRoutes);
   app.use('/api', settingsRoutes);
   app.use('/api', usageRoutes);

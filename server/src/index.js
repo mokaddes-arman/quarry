@@ -14,6 +14,7 @@ const { initDb, closeDb, dbKind } = require('./db');
 const { migrate } = require('./db/migrate');
 const { startWorker, stopWorker } = require('./ingestion/worker');
 const crawlWorker = require('./crawl/worker');
+const users = require('./services/users');
 
 async function bootstrap() {
   ensureRuntimeDirs();
@@ -28,6 +29,25 @@ async function bootstrap() {
   await initDb();
   await migrate();
   logger.info({ backend: dbKind() }, 'database ready');
+
+  await users.pruneAuthArtifacts().catch(() => {});
+
+  // First run: create the administrator from ADMIN_EMAIL (if configured) so the
+  // operator can always sign in. The login URL is printed once, to the server
+  // console only, because email may not be configured yet.
+  const bootstrapped = await users.bootstrapAdmin({
+    origin: config.appPublicUrl || `http://${config.host}:${config.port}`,
+  });
+  if (bootstrapped) {
+    logger.warn(
+      { email: bootstrapped.user.email },
+      'first administrator created. Open the login URL printed above to sign in.',
+    );
+  } else if (await users.setupRequired()) {
+    logger.warn(
+      'No users exist yet. Open the web app and complete the first-run setup, or set ADMIN_EMAIL in .env and restart.',
+    );
+  }
 
   await startWorker();
   await crawlWorker.startWorker();

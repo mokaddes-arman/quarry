@@ -65,15 +65,74 @@ async function withQueryTimeout(promise, timeoutMs, label) {
   return Promise.race([promise, guard]).finally(() => clearTimeout(timer));
 }
 
+// Resolved from this module, not process.cwd(), so it works no matter which
+// directory the server is started from (for example Render's server workspace).
+const BUNDLED_DB_CA_PATH = path.resolve(__dirname, '..', '..', 'certs', 'prod-ca-2021.crt');
+
+/**
+ * Load the database CA certificate.
+ * Priority: DB_CA_CERT (contents), then the bundled public certificate file.
+ */
+function loadDatabaseCa() {
+  const fromEnv = process.env.DB_CA_CERT;
+  if (fromEnv && fromEnv.trim()) {
+    // Environment variables often contain literal \n sequences instead of newlines.
+    return fromEnv.replace(/\\n/g, '\n');
+  }
+
+  try {
+    return fs.readFileSync(BUNDLED_DB_CA_PATH, 'utf8');
+  } catch (err) {
+    throw new AppError(
+      `Cannot load the database CA certificate: DB_CA_CERT is not set and ` +
+        `"${BUNDLED_DB_CA_PATH}" could not be read (${err.code || err.message}). ` +
+        'Set DB_CA_CERT to the certificate contents (literal \\n line breaks are supported), ' +
+        'or restore the bundled certificate file.',
+      { code: Codes.DATABASE_CA_UNAVAILABLE, status: 503, cause: err },
+    );
+  }
+}
+
+function databaseNeedsCa(connectionString) {
+  if (process.env.DB_CA_CERT && process.env.DB_CA_CERT.trim()) return true;
+  try {
+    return new URL(connectionString).searchParams.has('sslrootcert');
+  } catch {
+    return /[?&]sslrootcert=/.test(connectionString);
+  }
+}
+
+/**
+ * `pg` reads sslrootcert relative to process.cwd(). Remove the SSL parameters
+ * from the URL because the CA and SSL mode are supplied explicitly instead.
+ */
+function connectionStringWithoutSslParams(connectionString) {
+  try {
+    const url = new URL(connectionString);
+    for (const key of ['sslrootcert', 'sslmode', 'ssl']) url.searchParams.delete(key);
+    return url.toString();
+  } catch {
+    return connectionString;
+  }
+}
+
 async function createPostgresAdapter() {
   const { Pool } = require('pg');
-  const pool = new Pool({
+  const poolConfig = {
     connectionString: config.databaseUrl,
     max: 10,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
     application_name: 'global-softel-rag-chat',
-  });
+  };
+
+  if (databaseNeedsCa(config.databaseUrl)) {
+    const ca = loadDatabaseCa();
+    poolConfig.connectionString = connectionStringWithoutSslParams(config.databaseUrl);
+    poolConfig.ssl = { ca, rejectUnauthorized: true };
+  }
+
+  const pool = new Pool(poolConfig);
   pool.on('error', (err) => logger.error({ err: err.message }, 'Postgres pool error'));
 
   try {

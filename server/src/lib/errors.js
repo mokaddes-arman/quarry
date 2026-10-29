@@ -42,6 +42,7 @@ const Codes = {
   EMBEDDING_UNAVAILABLE: 'embedding_unavailable',
   EMBEDDING_DIM_MISMATCH: 'embedding_dim_mismatch',
   DATABASE_UNAVAILABLE: 'database_unavailable',
+  DATABASE_CA_UNAVAILABLE: 'database_ca_unavailable',
   DATABASE_TIMEOUT: 'database_timeout',
   DATABASE_DEADLOCK: 'database_deadlock',
   INVALID_API_KEY: 'invalid_api_key',

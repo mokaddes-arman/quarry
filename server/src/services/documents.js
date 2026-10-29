@@ -443,6 +443,16 @@ async function reindexDocument(documentId, { versionId = null } = {}) {
   const target = versionId || doc.current_version_id;
   if (!target) throw new AppError('Document has no version to re-index.', { code: Codes.CONFLICT, status: 409 });
 
+  // A version id is client-supplied: never let it point at another document
+  // (or another tenant's document) while re-indexing this one.
+  const { rows: versionRows } = await query(
+    'SELECT id FROM document_versions WHERE id = $1 AND document_id = $2',
+    [target, documentId],
+  );
+  if (!versionRows[0]) {
+    throw new AppError('Version not found for this document.', { code: Codes.NOT_FOUND, status: 404 });
+  }
+
   const jobId = newId();
   await withTransaction(async (tx) => {
     await tx.query(

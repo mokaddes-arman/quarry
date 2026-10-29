@@ -92,7 +92,35 @@ const config = {
 
   appMasterKey: str('APP_MASTER_KEY', ''),
   storageDir: resolveFromRoot(str('STORAGE_DIR'), './storage'),
-  maxUploadSizeMb: int('MAX_UPLOAD_SIZE_MB', 50),
+  maxUploadSizeMb: int('MAX_UPLOAD_SIZE_MB', 20),
+
+  // Absolute base URL used in emailed login links (e.g. https://rag.example.com).
+  // When empty, the origin of the request that triggered the invitation is used.
+  appPublicUrl: String(str('APP_PUBLIC_URL', '') || '').replace(/\/+$/, ''),
+
+  auth: {
+    // Sign-in links are single use and short lived.
+    tokenTtlMinutes: Math.max(5, int('AUTH_TOKEN_TTL_MINUTES', 30)),
+    sessionDays: Math.max(1, int('AUTH_SESSION_DAYS', 14)),
+    cookieName: 'gs_session',
+    // Secure cookies require HTTPS. Enabled automatically in production unless
+    // explicitly overridden (some deployments terminate TLS in front of the app).
+    cookieSecure: bool('COOKIE_SECURE', nodeEnv === 'production'),
+    // First-run bootstrap: when there are no users yet, this address becomes the
+    // administrator (and a login link is printed to the server log).
+    adminEmail: str('ADMIN_EMAIL', ''),
+    adminName: str('ADMIN_NAME', 'Administrator'),
+  },
+
+  mail: {
+    host: str('SMTP_HOST', ''),
+    port: int('SMTP_PORT', 587),
+    secure: bool('SMTP_SECURE', false),
+    user: str('SMTP_USER', ''),
+    pass: str('SMTP_PASS', ''),
+    from: str('MAIL_FROM', 'Global Softel RAG Chat <no-reply@localhost>'),
+    replyTo: str('MAIL_REPLY_TO', ''),
+  },
 
   chunkSizeChars: int('CHUNK_SIZE_CHARS', 1200),
   chunkOverlapChars: int('CHUNK_OVERLAP_CHARS', 180),

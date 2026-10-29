@@ -4,39 +4,55 @@ const { query, withTransaction } = require('../db');
 const { AppError, Codes } = require('../lib/errors');
 const { slugify, slugSuffix } = require('../lib/ids');
 
-const PROJECT_COLUMNS = `id, name, slug, description, instructions, status, settings, created_at, updated_at`;
+const PROJECT_COLUMNS = `id, name, slug, description, instructions, status, settings, owner_user_id, created_at, updated_at`;
 
-async function listProjects({ includeArchived = false } = {}) {
+function ownerFilter(user, params) {
+  if (!user || user.role === 'admin') return '';
+  return `owner_user_id = $${params.push(user.id)}`;
+}
+
+async function listProjects({ includeArchived = false, user = null } = {}) {
+  const conditions = [];
+  const params = [];
+  if (!includeArchived) conditions.push("status = 'active'");
+  const owner = ownerFilter(user, params);
+  if (owner) conditions.push(owner);
   const { rows } = await query(
     `SELECT ${PROJECT_COLUMNS} FROM projects
-     ${includeArchived ? '' : "WHERE status = 'active'"}
+     ${conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''}
      ORDER BY name ASC`,
+    params,
   );
   return rows;
 }
 
-async function getProject(id) {
-  const { rows } = await query(`SELECT ${PROJECT_COLUMNS} FROM projects WHERE id = $1`, [id]);
+async function getProject(id, { user = null } = {}) {
+  const params = [id];
+  const owner = ownerFilter(user, params);
+  const { rows } = await query(
+    `SELECT ${PROJECT_COLUMNS} FROM projects WHERE id = $1${owner ? ` AND ${owner}` : ''}`,
+    params,
+  );
   return rows[0] || null;
 }
 
-async function requireProject(id) {
-  const project = await getProject(id);
+async function requireProject(id, { user = null } = {}) {
+  const project = await getProject(id, { user });
   if (!project) throw new AppError('Project not found.', { code: Codes.NOT_FOUND, status: 404 });
   return project;
 }
 
 /** Create a project, guaranteeing a unique slug even for duplicate names. */
-async function createProject({ name, description = null, instructions = null, settings = {} }) {
+async function createProject({ name, description = null, instructions = null, settings = {}, ownerUserId = null }) {
   const base = slugify(name, 'project');
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const slug = attempt === 0 ? base : `${base}-${slugSuffix()}`;
     try {
       const { rows } = await query(
-        `INSERT INTO projects (name, slug, description, instructions, settings)
-         VALUES ($1, $2, $3, $4, $5::jsonb)
+        `INSERT INTO projects (name, slug, description, instructions, settings, owner_user_id)
+         VALUES ($1, $2, $3, $4, $5::jsonb, $6)
          RETURNING ${PROJECT_COLUMNS}`,
-        [name.trim(), slug, description, instructions, JSON.stringify(settings)],
+        [name.trim(), slug, description, instructions, JSON.stringify(settings), ownerUserId],
       );
       return rows[0];
     } catch (err) {
@@ -47,7 +63,7 @@ async function createProject({ name, description = null, instructions = null, se
   throw new AppError('Could not generate a unique project slug.', { code: Codes.CONFLICT, status: 409 });
 }
 
-async function updateProject(id, { name, description, instructions, status, settings }) {
+async function updateProject(id, { name, description, instructions, status, settings }, { user = null } = {}) {
   const sets = [];
   const params = [];
   if (name !== undefined) sets.push(`name = $${params.push(name.trim())}`);
@@ -55,27 +71,28 @@ async function updateProject(id, { name, description, instructions, status, sett
   if (instructions !== undefined) sets.push(`instructions = $${params.push(instructions)}`);
   if (status !== undefined) sets.push(`status = $${params.push(status)}`);
   if (settings !== undefined) sets.push(`settings = $${params.push(JSON.stringify(settings))}::jsonb`);
-  if (!sets.length) return requireProject(id);
+  if (!sets.length) return requireProject(id, { user });
   params.push(id);
+  const owner = ownerFilter(user, params);
   const { rows } = await query(
-    `UPDATE projects SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING ${PROJECT_COLUMNS}`,
+    `UPDATE projects SET ${sets.join(', ')} WHERE id = $${params.length}${owner ? ` AND ${owner}` : ''} RETURNING ${PROJECT_COLUMNS}`,
     params,
   );
   if (!rows[0]) throw new AppError('Project not found.', { code: Codes.NOT_FOUND, status: 404 });
   return rows[0];
 }
 
-const archiveProject = (id) => updateProject(id, { status: 'archived' });
-const restoreProject = (id) => updateProject(id, { status: 'active' });
+const archiveProject = (id, opts = {}) => updateProject(id, { status: 'archived' }, opts);
+const restoreProject = (id, opts = {}) => updateProject(id, { status: 'active' }, opts);
 
 /**
  * Delete a project and everything inside it. ON DELETE CASCADE removes
  * documents, versions, chunks, jobs, conversations and messages. Stored files
- * are removed by the caller (documents service) before this runs, because the
+ * are removed by the caller (routes/projects.js) before this runs, because the
  * database must never be the only record of where a file lives.
  */
-async function deleteProject(id) {
-  await requireProject(id);
+async function deleteProject(id, { user = null } = {}) {
+  await requireProject(id, { user });
   return withTransaction(async (tx) => {
     const { rows } = await tx.query(`DELETE FROM projects WHERE id = $1 RETURNING id, name, slug`, [id]);
     return rows[0];

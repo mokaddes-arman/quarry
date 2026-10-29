@@ -4,13 +4,24 @@ const express = require('express');
 const { z } = require('zod');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { validateBody, validateUuidParam, validateQuery, booleanQuery } = require('../middleware/validate');
-const { notFound } = require('../lib/errors');
 const projects = require('../services/projects');
 const documents = require('../services/documents');
 const conversations = require('../services/conversations');
+const access = require('../services/access');
 const storage = require('../lib/storage');
 
 const router = express.Router();
+
+// Every /:id route below is scoped to the signed-in user. An administrator sees
+// every project; a normal user sees only the projects they own.
+router.param('id', async (req, _res, next, id) => {
+  try {
+    req.project = await access.assertProject(req.user, id);
+    return next();
+  } catch (err) {
+    return next(err);
+  }
+});
 
 const createSchema = z.object({
   name: z.string().trim().min(1, 'Project name is required').max(200),
@@ -31,7 +42,12 @@ router.get(
   '/',
   validateQuery(z.object({ includeArchived: booleanQuery() })),
   asyncHandler(async (req, res) => {
-    res.json({ projects: await projects.listProjects({ includeArchived: Boolean(req.validatedQuery?.includeArchived) }) });
+    res.json({
+      projects: await projects.listProjects({
+        includeArchived: Boolean(req.validatedQuery?.includeArchived),
+        user: req.user,
+      }),
+    });
   }),
 );
 
@@ -39,7 +55,7 @@ router.post(
   '/',
   validateBody(createSchema),
   asyncHandler(async (req, res) => {
-    const project = await projects.createProject(req.validated);
+    const project = await projects.createProject({ ...req.validated, ownerUserId: req.user.id });
     res.status(201).json({ project });
   }),
 );
@@ -48,8 +64,7 @@ router.get(
   '/:id',
   validateUuidParam('id'),
   asyncHandler(async (req, res) => {
-    const project = await projects.requireProject(req.params.id);
-    res.json({ project });
+    res.json({ project: req.project });
   }),
 );
 
@@ -58,7 +73,7 @@ router.patch(
   validateUuidParam('id'),
   validateBody(updateSchema),
   asyncHandler(async (req, res) => {
-    const project = await projects.updateProject(req.params.id, req.validated);
+    const project = await projects.updateProject(req.project.id, req.validated, { user: req.user });
     res.json({ project });
   }),
 );
@@ -67,7 +82,7 @@ router.post(
   '/:id/archive',
   validateUuidParam('id'),
   asyncHandler(async (req, res) => {
-    res.json({ project: await projects.archiveProject(req.params.id) });
+    res.json({ project: await projects.archiveProject(req.project.id, { user: req.user }) });
   }),
 );
 
@@ -75,7 +90,7 @@ router.post(
   '/:id/restore',
   validateUuidParam('id'),
   asyncHandler(async (req, res) => {
-    res.json({ project: await projects.restoreProject(req.params.id) });
+    res.json({ project: await projects.restoreProject(req.project.id, { user: req.user }) });
   }),
 );
 
@@ -88,7 +103,7 @@ router.delete(
   validateUuidParam('id'),
   validateQuery(z.object({ confirm: z.literal('yes') })),
   asyncHandler(async (req, res) => {
-    const project = await projects.requireProject(req.params.id);
+    const project = req.project;
     const { rows } = await require('../db').query('SELECT id FROM documents WHERE project_id = $1', [project.id]);
     for (const doc of rows) {
       await storage.removeVersionDirectory(project.id, doc.id).catch(() => {});
@@ -102,8 +117,7 @@ router.get(
   '/:id/stats',
   validateUuidParam('id'),
   asyncHandler(async (req, res) => {
-    await projects.requireProject(req.params.id);
-    res.json({ stats: await projects.projectStats(req.params.id) });
+    res.json({ stats: await projects.projectStats(req.project.id) });
   }),
 );
 
@@ -122,8 +136,7 @@ router.get(
     }),
   ),
   asyncHandler(async (req, res) => {
-    await projects.requireProject(req.params.id);
-    const result = await documents.listDocuments(req.params.id, req.validatedQuery || {});
+    const result = await documents.listDocuments(req.project.id, req.validatedQuery || {});
     res.json(result);
   }),
 );
@@ -140,8 +153,7 @@ router.get(
     }),
   ),
   asyncHandler(async (req, res) => {
-    await projects.requireProject(req.params.id);
-    res.json({ conversations: await conversations.listConversations(req.params.id, req.validatedQuery || {}) });
+    res.json({ conversations: await conversations.listConversations(req.project.id, req.validatedQuery || {}) });
   }),
 );
 
@@ -152,8 +164,7 @@ router.get(
     z.object({ status: z.enum(['queued', 'processing', 'completed', 'failed', 'cancelled']).optional(), limit: z.coerce.number().int().min(1).max(200).optional() }),
   ),
   asyncHandler(async (req, res) => {
-    await projects.requireProject(req.params.id);
-    res.json({ jobs: await documents.listJobs(req.params.id, req.validatedQuery || {}) });
+    res.json({ jobs: await documents.listJobs(req.project.id, req.validatedQuery || {}) });
   }),
 );
 
@@ -169,9 +180,8 @@ router.get(
     }),
   ),
   asyncHandler(async (req, res) => {
-    await projects.requireProject(req.params.id);
     const result = await conversations.retrieveEvidence({
-      projectId: req.params.id,
+      projectId: req.project.id,
       question: req.validatedQuery.q,
       options: {
         retrieval: {

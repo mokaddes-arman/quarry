@@ -18,13 +18,31 @@ const { config, ensureRuntimeDirs } = require('../src/config/env');
 
 let app = null;
 
+// Deterministic administrator used by the API tests. The app is created with
+// testAuth enabled, so requests are authenticated as this user unless the test
+// explicitly impersonates somebody else with the x-test-user header.
+const TEST_ADMIN_ID = '00000000-0000-4000-8000-000000000001';
+const TEST_ADMIN_EMAIL = 'admin@test.local';
+
+async function ensureTestAdmin() {
+  const { rows } = await query(
+    `INSERT INTO users (id, email, email_normalised, name, role, status)
+     VALUES ($1, $2, $2, 'Test Admin', 'admin', 'active')
+     ON CONFLICT (email_normalised) DO UPDATE SET role = 'admin', status = 'active', name = 'Test Admin'
+     RETURNING id`,
+    [TEST_ADMIN_ID, TEST_ADMIN_EMAIL],
+  );
+  return rows[0].id;
+}
+
 async function setupTestApp() {
   ensureRuntimeDirs();
   await initDb();
   await migrate({ log: false });
+  const adminId = await ensureTestAdmin();
   await startWorker();
   await crawlWorker.startWorker();
-  app = createApp();
+  app = createApp({ testAuth: true, testAuthUserId: adminId });
   return app;
 }
 
@@ -42,11 +60,13 @@ function getApp() {
 
 /** Wipe all application data between tests (keeps migrations in place). */
 async function resetData() {
+  // Users (and therefore the seeded administrator) survive between tests; all
+  // project data and any sessions/tokens do not.
   await query(`TRUNCATE message_sources, messages, conversations, document_chunks, ingestion_jobs,
                         document_versions, documents, embedding_models, embedding_configs,
                         llm_provider_configs, projects, application_settings,
                         crawl_jobs, collection_items, web_links, link_list_items, link_lists,
-                        collections CASCADE`);
+                        collections, auth_sessions, auth_login_tokens CASCADE`);
 }
 
 async function createProject(name = 'Test Project', description = null) {
@@ -144,6 +164,32 @@ async function addMockProvider({ name = 'Mock Provider', isDefaultChat = true } 
   return res.body.config;
 }
 
+/** Create an additional account, for per-user isolation tests. */
+async function createTestUser({ email, name = null, role = 'user', status = 'active' } = {}) {
+  const { rows } = await query(
+    `INSERT INTO users (email, email_normalised, name, role, status)
+     VALUES ($1, lower($1), $2, $3, $4)
+     RETURNING id, email, name, role, status`,
+    [email, name, role, status],
+  );
+  return rows[0];
+}
+
+/**
+ * A supertest chain that impersonates a specific user. testAuth must be on (it
+ * is for the shared app), and this header is ignored in production.
+ */
+function requestAs(userId) {
+  const withUser = (test) => test.set('x-test-user', userId);
+  return {
+    get: (url) => withUser(request(getApp()).get(url)),
+    post: (url) => withUser(request(getApp()).post(url)),
+    put: (url) => withUser(request(getApp()).put(url)),
+    patch: (url) => withUser(request(getApp()).patch(url)),
+    delete: (url) => withUser(request(getApp()).delete(url)),
+  };
+}
+
 function tempFile(name, content) {
   const p = path.join(os.tmpdir(), `rag-test-${Date.now()}-${name}`);
   fs.writeFileSync(p, content);
@@ -165,6 +211,10 @@ module.exports = {
   addMockProvider,
   tempFile,
   request,
+  requestAs,
+  createTestUser,
+  TEST_ADMIN_ID,
+  TEST_ADMIN_EMAIL,
   query,
   config,
 };

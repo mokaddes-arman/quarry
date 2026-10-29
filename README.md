@@ -62,6 +62,8 @@ npm install
 Copy-Item .env.example .env
 node -e "console.log('APP_MASTER_KEY=' + require('crypto').randomBytes(32).toString('base64'))"
 #   -> paste that line into .env (replace the placeholder)
+#   Optional: set ADMIN_EMAIL=you@company.com to create the first administrator at boot;
+#   otherwise you will be asked to create one in the UI on first launch.
 
 # 3. Pre-flight check (Node/npm/.env/master key/storage)
 npm run setup
@@ -87,8 +89,10 @@ npm run build      # builds web/dist
 npm start          # serves UI + API on http://127.0.0.1:3001
 ```
 
-Then in the UI: **create a project → upload documents → wait for "indexed" → ask a question
-→ read the grounded answer and expand its citations.**
+Then in the UI: **sign in → create a project → upload documents → wait for "indexed" → ask a
+question → read the grounded answer and expand its citations.** Accounts are passwordless: the
+first launch asks you to create the administrator, after which you invite users from the
+**Admin** page (see below for email setup).
 
 To get *generated* answers you must add an LLM provider key in **Settings** (stored
 encrypted). With no key configured, retrieval, document management and citation inspection
@@ -139,6 +143,73 @@ Database: PostgreSQL + pgvector  (or embedded PGlite + pgvector)
 - **Knowledge base:** besides files, a project can hold **web links** (pages that are crawled
   into documents), **link lists** (a named set of URLs to import in one go) and
   **collections** (named groups of documents and links). See below.
+- **Accounts:** passwordless sign-in with single-use email links; users only see their own
+  projects, administrators see everything. See below.
+
+### Accounts, sign-in and administration
+
+There are no passwords. A user enters their email address and receives a **single-use,
+time-limited sign-in link** (`/login#token=...`). The token travels in the URL fragment, so it
+is never sent to the server or written to access logs, and it is removed from the address bar
+as soon as it is consumed. A successful sign-in sets an HttpOnly, `SameSite=Lax` session
+cookie (`gs_session`); state-changing requests additionally require a same-origin request.
+
+**First run.** Either set `ADMIN_EMAIL` (and optionally `ADMIN_NAME`) in `.env` - the first
+administrator is created at boot and a sign-in URL is printed to the server console - or open
+the web app and complete the one-time setup screen. Do this **immediately** after the first
+deploy (or set `ADMIN_EMAIL` up front): until the first account exists, whoever reaches the
+setup screen can claim the administrator role. Projects that existed before accounts were
+introduced are assigned to the first administrator.
+
+**Administration.** Administrators get an **Admin** entry in the sidebar with:
+
+- workspace totals (users, invites, projects, documents, chunks, conversations, active jobs);
+- user management: create an account (which emails a sign-in link), resend a link, promote or
+  demote, disable/enable, revoke all sessions, and delete a user (their projects must be
+  reassigned to another administrator).
+
+**Email.** Set `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` and
+`MAIL_FROM` to send links automatically. SMTP is optional: when it is not configured (or a
+send fails) the invitation still succeeds and the one-time link is returned **once** to the
+administrator in the UI so it can be handed over by another channel. Mail failures never
+break account creation.
+
+**Isolation.** `projects.owner_user_id` decides visibility. A normal user can only read or
+change their own projects and everything hanging off them (documents, versions, chunks,
+conversations, links, link lists, collections, jobs). Foreign resources return **404**, not
+403, so the API never confirms that somebody else's data exists. Cross-project search is
+filtered to the caller's own projects. Global configuration (providers, settings, model
+usage, user management) is administrator-only; the only non-admin exception is the personal
+`ui_theme` preference and the read-only model list used by the chat selector.
+
+### Supabase / hosted Postgres: lock down the public schema
+
+Supabase exposes the `public` schema over PostgREST to the `anon` and `authenticated` roles by
+default. This app talks to Postgres directly (the table owner), so it does not need that
+surface at all. Migration **`007_lockdown_public.sql`** revokes `anon`/`authenticated` grants
+on every table in `public`, removes default privileges, and enables row-level security with no
+policies, which makes PostgREST return nothing even if the schema stays exposed.
+
+Also do this once in the Supabase dashboard:
+
+1. **Project Settings → API → Exposed schemas:** remove `public` (keep only the schemas you
+   actually expose; none for this app).
+2. Keep using the **session pooler** (`…pooler.supabase.com:5432`) rather than the
+   transaction pooler (`:6543`), and use a database user that owns the tables (or has
+   `BYPASSRLS`) — the RLS-with-no-policies lockdown otherwise blocks the app itself.
+3. Use TLS and verify the server certificate. The verified shape is:
+   `...?sslmode=verify-full&sslrootcert=./certs/prod-ca-2021.crt`. The server replaces
+   `sslrootcert` with the bundled public CA at `server/certs/prod-ca-2021.crt`, resolved
+   from the code rather than the current working directory, so it works on hosts like
+   Render. Set `DB_CA_CERT` to the certificate contents to override the file (literal
+   `\n` line breaks are supported). Download the public CA from **Database Settings →
+   SSL Configuration**. Current `pg` treats bare `sslmode=require` as verify-full, so it
+   needs the CA; `sslmode=no-verify` encrypts but does not authenticate the server. Also
+   enable **Enforce SSL on incoming connections** in the dashboard.
+
+Run the migration again after adding any table to `public`, or enable RLS on it manually.
+`npm run check` verifies the result on a live host: it fails if `anon`/`authenticated`
+still hold table privileges or if any table in `public` has RLS disabled.
 
 ### The Documents page: "Upload documents" and "View documents"
 
@@ -249,6 +320,11 @@ The most important ones:
 | `PGLITE_DIR` | Embedded database directory. | `./storage/pgdata` |
 | `APP_MASTER_KEY` | 32+ char key that encrypts provider keys at rest. | *(must set)* |
 | `STORAGE_DIR` | Uploaded files and artefacts. | `./storage` |
+| `MAX_UPLOAD_SIZE_MB` | Per-file upload cap. | `20` |
+| `ADMIN_EMAIL` | First administrator, created on boot when the user table is empty. | *(empty)* |
+| `APP_PUBLIC_URL` | Public origin used in emailed sign-in links. | *(request host)* |
+| `AUTH_TOKEN_TTL_MINUTES` | Lifetime of a single-use sign-in link. | `30` |
+| `AUTH_SESSION_DAYS` | Lifetime of a browser session. | `14` |
 | `DEFAULT_EMBEDDING_PROVIDER` | `local` \| `ollama` \| `openai` \| `hash`. | `local` |
 | `DEFAULT_EMBEDDING_MODEL` | Model id (must match `EMBEDDING_DIM`). | `Xenova/all-MiniLM-L6-v2` |
 | `EMBEDDING_DIM` | Stored vector dimension. | `384` |
@@ -259,6 +335,9 @@ The most important ones:
 | `GROQ_API_KEY` | *(optional)* env fallback for the Groq key. | *(empty)* |
 | `RETRIEVAL_TOP_K` | Number of chunks returned. | `8` |
 | `CRAWL_ALLOW_PRIVATE_HOSTS` | Allow the crawler to fetch loopback/private hosts (SSRF guard). | `false` |
+| `SMTP_HOST` / `SMTP_PORT` | SMTP server for sign-in and invitation emails. | *(empty → links shown to the admin)* |
+| `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` | SMTP TLS + credentials. | `false` |
+| `MAIL_FROM` / `MAIL_REPLY_TO` | Sender used in outgoing mail. | *(`no-reply@localhost`)* |
 
 ### Web crawling
 
@@ -311,6 +390,10 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 npm run db:migrate
 ```
 
+For Supabase (or any hosted Postgres that exposes a REST API) also follow
+[Supabase / hosted Postgres: lock down the public schema](#supabase--hosted-postgres-lock-down-the-public-schema)
+above. Use the session pooler on port `5432`, not the transaction pooler.
+
 ---
 
 ## Commands
@@ -326,7 +409,7 @@ Run from the repository root:
 | `npm run build` | Build the React SPA into `web/dist`. |
 | `npm start` | Serve API **and** built SPA from one origin (`:3001`). |
 | `npm run db:migrate` / `npm run db:status` | Apply / inspect migrations. |
-| `npm run check` | Backend readiness report (DB, pgvector, schema, embeddings, providers). |
+| `npm run check` | Backend readiness report (DB, pgvector, schema, REST-exposure lockdown, embeddings, providers). |
 | `npm test` | Backend unit + integration tests (Vitest). |
 | `npm run test:e2e` | Playwright end-to-end suite (builds the SPA and boots its own server). |
 | `npm run eval:rag` | Offline retrieval evaluation dataset + grounded-answer smoke test. |
@@ -339,8 +422,8 @@ Current status on this machine (all commands run from the repo root):
 
 | Suite | Command | Result |
 | --- | --- | --- |
-| Backend unit + integration | `npm test` | **128 passed** (14 files) |
-| End-to-end (real browser + real backend) | `npm run test:e2e` | **17 passed** |
+| Backend unit + integration | `npm test` | **165 passed** (17 files) |
+| End-to-end (real browser + real backend) | `npm run test:e2e` | **20 passed** |
 | Retrieval evaluation | `npm run eval:rag` | **8/8 retrieval (100%) + e2e smoke pass** |
 | Backend readiness | `npm run check` | **all checks passed** |
 
@@ -349,14 +432,20 @@ Current status on this machine (all commands run from the repo root):
 - **Backend tests** — parsers, chunker, encryption, security (path traversal, validation,
   CORS), projects, documents/versioning, providers, retrieval, and the chat contract
   (grounding, abstention, source persistence, SSE streaming, prompt-injection wrapping).
-  The knowledge base has its own coverage: URL parsing/canonicalisation, private-host
-  refusal, link lists, collections, crawl jobs and the `.md` export.
+  Auth and isolation have dedicated coverage: magic-link single use/expiry, sessions,
+  CSRF, disabled accounts, first-run setup, 401/403/404 boundaries, admin user CRUD
+  (invite/resend/disable/delete/reassign), cross-project retrieval scoping and the
+  admin-only surfaces. The knowledge base has its own coverage:
+  URL parsing/canonicalisation, private-host refusal, link lists, collections, crawl jobs
+  and the `.md` export.
 - **End-to-end tests** — a real Chromium browser drives the actual SPA against a real
   backend: onboarding → project → document upload → indexing → ask → read the grounded
   answer and expand its citations; the HTTP-level RAG contract (retrieval, grounding,
   abstention on empty projects, per-project isolation and explicit cross-project opt-in);
-  and the knowledge-base flow (crawl a page → it becomes a document → preview and download
-  its `.md`, create a link list and a collection).
+  the knowledge-base flow (crawl a page → it becomes a document → preview and download
+  its `.md`, create a link list and a collection); and the admin flow (invite a user →
+  open the one-time link in a clean browser → the new account gets an isolated,
+  project-less workspace, cannot see admin navigation, and the link cannot be reused).
 - **RAG evaluation** — ingests a small labelled corpus and checks the right chunks are
   retrieved, that clearly-absent facts are **not** surfaced, and that a question yields a
   grounded answer with citations.
@@ -375,6 +464,8 @@ All routes are under `/api`. Highlights:
 
 | Area | Endpoints |
 | --- | --- |
+| Auth | `GET /auth/status`, `GET /auth/me`, `POST /auth/setup` (first run only), `POST /auth/request-link`, `POST /auth/verify`, `POST /auth/logout` |
+| Administration | `GET /admin/overview`, `GET/POST /admin/users`, `PATCH /admin/users/:id`, `POST /admin/users/:id/resend`, `DELETE /admin/users/:id/sessions`, `DELETE /admin/users/:id?reassign=<adminId>` (admin only) |
 | Health | `GET /health`, `GET /health/ready`, `GET /system/status` |
 | Projects | `GET/POST /projects`, `GET/PATCH/DELETE /projects/:id` |
 | Documents | `POST /projects/:projectId/documents/upload`, `GET /projects/:id/documents`, `GET/DELETE /documents/:id`, `GET /documents/:id/versions`, `POST /documents/:id/activate-version`, `POST /documents/:id/reindex`, `POST /documents/:id/restore`, `GET /documents/:id/file`, `GET /chunks/:id` |
@@ -386,9 +477,9 @@ All routes are under `/api`. Highlights:
 | Conversations | `POST /projects/:projectId/conversations`, `GET /projects/:id/conversations`, `GET/PATCH/DELETE /conversations/:id`, `GET /conversations/:id/messages` |
 | Answering | `POST /conversations/:id/messages` (SSE stream or JSON), `POST /conversations/:id/evidence` (retrieval only) |
 | Projects (extra) | `GET /projects/:id/stats`, `GET /projects/:id/search`, `POST /projects/:id/archive` and `/restore`, `GET /projects/:id/jobs`, `POST /jobs/:id/retry` |
-| Providers | `GET /providers/metadata`, `GET/POST /providers/llm`, `GET/PATCH/DELETE /providers/llm/:id`, `POST /providers/llm/test` (and `/:id/test`), `POST /providers/llm/:id/default`; the same shape for `/providers/embedding` |
-| Usage | `GET /model-usage` (per-model token usage; `from`, `to`, `granularity`, `provider`, `model`, `projectId`), `GET /model-usage/catalog` (the configured OpenRouter/Groq models) |
-| Settings | `GET/PUT /settings`, `GET /settings/:key`, `GET /settings/embedding-index` |
+| Providers | `GET /providers/metadata`, `GET /providers/llm` (safe fields for every signed-in user); everything else (create/edit/test/default, `/providers/embedding`) is **admin only** |
+| Usage | `GET /model-usage` (per-model token usage; `from`, `to`, `granularity`, `provider`, `model`, `projectId`), `GET /model-usage/catalog` (admin only) |
+| Settings | `GET /settings`, `GET/PUT /settings/:key`, `GET /settings/embedding-index` (admin only); `PUT /settings/ui_theme` is available to every signed-in user |
 
 Streaming answers emit Server-Sent Events: `status`, `retrieval`, `sources`, `token`,
 `done`, `complete`, `error`.
@@ -399,8 +490,18 @@ Streaming answers emit Server-Sent Events: `status`, `retrieval`, `sources`, `to
 
 - **Localhost only by default** (`HOST=127.0.0.1`); narrow CORS allow-list; strict security
   headers; no `x-powered-by`.
+- **Passwordless authentication:** single-use emailed sign-in links, SHA-256-hashed tokens,
+  HttpOnly `SameSite=Lax` session cookies, same-origin enforcement for unsafe methods
+  (CSRF), per-address/per-IP throttling on the auth endpoints, and immediate session
+  revocation on logout or by an administrator.
+- **Per-user isolation:** every project has an owner; normal users can only reach their own
+  projects and the rows attached to them. Foreign resources are reported as 404. Global
+  administration surfaces are role-gated on the server, not just hidden in the UI.
+- **Hosted Postgres lockdown:** the Supabase migration revokes `anon`/`authenticated` access
+  and enables deny-by-default RLS on `public` (see above).
 - **Every request body/query/param is validated with Zod**; SQL is fully parameterised.
-- **Uploads** are stored with sanitised names; path traversal is rejected; size limits apply.
+- **Uploads** are stored with sanitised names; path traversal is rejected; size limits apply
+  (`MAX_UPLOAD_SIZE_MB`, 20 MB by default).
 - **API keys** are encrypted with AES-256-GCM using a key derived from `APP_MASTER_KEY`,
   returned only masked, and never logged.
 - **Prompt injection:** retrieved text is wrapped in explicit evidence blocks and the system

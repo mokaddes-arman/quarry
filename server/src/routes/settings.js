@@ -4,6 +4,7 @@ const express = require('express');
 const { z } = require('zod');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { validateBody } = require('../middleware/validate');
+const { requireAdmin } = require('../middleware/auth');
 const { getSetting, setSetting, embeddingIndexStatus } = require('../services/embeddings');
 const { config } = require('../config/env');
 
@@ -15,6 +16,23 @@ const ALLOWED_KEYS = new Set([
   'active_embedding_config_id',
   'cross_project_default',
 ]);
+
+/**
+ * Theme is the one setting every signed-in user may write: it is a display
+ * preference, not configuration. It is declared before the admin gate below.
+ */
+router.put(
+  '/settings/ui_theme',
+  validateBody(z.object({ value: z.any() })),
+  asyncHandler(async (req, res) => {
+    await setSetting('ui_theme', req.validated.value);
+    res.json({ key: 'ui_theme', value: await getSetting('ui_theme') });
+  }),
+);
+
+// Everything below exposes or changes system configuration. The path prefix
+// keeps the gate from applying to unrelated routers mounted at /api.
+router.use('/settings', requireAdmin);
 
 router.get(
   '/settings',

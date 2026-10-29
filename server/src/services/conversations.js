@@ -401,8 +401,12 @@ async function ask({ conversationId, question, emit = () => {}, signal, options 
     const crossProject = Boolean(options.crossProject);
     let projectIds = [conversation.project_id];
     if (crossProject) {
+      // `allowedProjectIds` is the caller's visible scope (per-user isolation).
+      // It is always supplied by the HTTP layer; internal callers may omit it.
+      const allowed = Array.isArray(options.allowedProjectIds) ? options.allowedProjectIds : null;
       const requested = Array.isArray(options.projectIds) && options.projectIds.length ? options.projectIds : null;
-      projectIds = requested || (await query(`SELECT id FROM projects WHERE status = 'active'`)).rows.map((r) => r.id);
+      const fallback = allowed ?? (await query(`SELECT id FROM projects WHERE status = 'active'`)).rows.map((r) => r.id);
+      projectIds = requested ? (allowed ? requested.filter((id) => allowed.includes(id)) : requested) : fallback;
     }
 
     let sources = [];
@@ -688,7 +692,13 @@ async function touchConversation(conversationId, { provider, model }) {
 /** Retrieve only - used by the "inspect evidence" panel and by tests. */
 async function retrieveEvidence({ projectId, question, options = {} }) {
   const embedding = await resolveActiveEmbedding();
-  const projectIds = options.crossProject ? (options.projectIds?.length ? options.projectIds : (await query(`SELECT id FROM projects WHERE status='active'`)).rows.map((r) => r.id)) : [projectId];
+  let projectIds = [projectId];
+  if (options.crossProject) {
+    const allowed = Array.isArray(options.allowedProjectIds) ? options.allowedProjectIds : null;
+    const requested = options.projectIds?.length ? options.projectIds : null;
+    const fallback = allowed ?? (await query(`SELECT id FROM projects WHERE status='active'`)).rows.map((r) => r.id);
+    projectIds = requested ? (allowed ? requested.filter((id) => allowed.includes(id)) : requested) : fallback;
+  }
   return retrieve({
     question,
     embedding,

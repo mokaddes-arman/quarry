@@ -11,13 +11,40 @@
  * extra configuration is required.
  */
 
+const { readFileSync } = require('node:fs');
+const path = require('node:path');
+
 const API_BASE = () => process.env.E2E_BASE_URL || `http://127.0.0.1:${process.env.E2E_PORT || 3101}`;
+
+// The backend writes a ready-made administrator session to a file once it is
+// listening (see `e2e/start-server.js`), so API calls never have to go through
+// the passwordless email flow.
+let cachedSession = null;
+function session() {
+  if (cachedSession) return cachedSession;
+  const file = process.env.E2E_SESSION_FILE || path.resolve(__dirname, '..', 'storage', '.e2e', 'session.json');
+  const deadline = Date.now() + 60_000;
+  for (;;) {
+    try {
+      cachedSession = JSON.parse(readFileSync(file, 'utf8'));
+      return cachedSession;
+    } catch (err) {
+      if (Date.now() > deadline) throw new Error(`e2e session file was not written: ${err.message}`);
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 200);
+    }
+  }
+}
+
+function authHeaders() {
+  return { cookie: `gs_session=${session().token}` };
+}
 
 async function api(pathname, { method = 'GET', body } = {}) {
   const res = await fetch(`${API_BASE()}${pathname}`, {
     method,
     headers: {
       accept: 'application/json',
+      ...authHeaders(),
       ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -75,6 +102,7 @@ async function uploadAndIndex(projectId, filename, content, { type = 'text/markd
   form.append('files', new Blob([Buffer.from(content, 'utf8')], { type }), filename);
   const res = await fetch(`${API_BASE()}/api/projects/${projectId}/documents/upload`, {
     method: 'POST',
+    headers: authHeaders(),
     body: form,
   });
   const data = await res.json();

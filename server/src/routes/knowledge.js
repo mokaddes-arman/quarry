@@ -4,7 +4,7 @@ const express = require('express');
 const { z } = require('zod');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { validateBody, validateQuery, validateUuidParam } = require('../middleware/validate');
-const projects = require('../services/projects');
+const access = require('../services/access');
 const knowledge = require('../services/knowledge');
 
 /**
@@ -76,7 +76,7 @@ router.get(
     }),
   ),
   asyncHandler(async (req, res) => {
-    await projects.requireProject(req.params.projectId);
+    await access.assertProject(req.user, req.params.projectId);
     const links = await knowledge.listWebLinks(req.params.projectId, req.validatedQuery || {});
     res.json({ links });
   }),
@@ -87,7 +87,7 @@ router.post(
   validateUuidParam('projectId'),
   validateBody(createLinkSchema),
   asyncHandler(async (req, res) => {
-    await projects.requireProject(req.params.projectId);
+    await access.assertProject(req.user, req.params.projectId);
     const result = await knowledge.createWebLinks(req.params.projectId, req.validated.urls, {
       collectionId: req.validated.collectionId || null,
       title: req.validated.title || null,
@@ -100,6 +100,7 @@ router.post(
 router.get(
   '/links/:id',
   validateUuidParam('id'),
+  access.requireOwnedAccess('link', 'id'),
   asyncHandler(async (req, res) => {
     const link = await knowledge.getWebLink(req.params.id);
     res.json({ link });
@@ -109,6 +110,7 @@ router.get(
 router.patch(
   '/links/:id',
   validateUuidParam('id'),
+  access.requireOwnedAccess('link', 'id'),
   validateBody(updateLinkSchema),
   asyncHandler(async (req, res) => {
     const link = await knowledge.updateWebLink(req.params.id, {
@@ -122,6 +124,7 @@ router.patch(
 router.delete(
   '/links/:id',
   validateUuidParam('id'),
+  access.requireOwnedAccess('link', 'id'),
   asyncHandler(async (req, res) => {
     res.json(await knowledge.deleteWebLink(req.params.id));
   }),
@@ -131,6 +134,7 @@ router.delete(
 router.post(
   '/links/:id/crawl',
   validateUuidParam('id'),
+  access.requireOwnedAccess('link', 'id'),
   asyncHandler(async (req, res) => {
     res.status(202).json(await knowledge.recrawlWebLink(req.params.id));
   }),
@@ -144,7 +148,7 @@ router.get(
   '/projects/:projectId/link-lists',
   validateUuidParam('projectId'),
   asyncHandler(async (req, res) => {
-    await projects.requireProject(req.params.projectId);
+    await access.assertProject(req.user, req.params.projectId);
     res.json({ linkLists: await knowledge.listLinkLists(req.params.projectId) });
   }),
 );
@@ -154,7 +158,7 @@ router.post(
   validateUuidParam('projectId'),
   validateBody(createLinkListSchema),
   asyncHandler(async (req, res) => {
-    await projects.requireProject(req.params.projectId);
+    await access.assertProject(req.user, req.params.projectId);
     const list = await knowledge.createLinkList(req.params.projectId, {
       name: req.validated.name,
       description: req.validated.description || null,
@@ -167,6 +171,7 @@ router.post(
 router.get(
   '/link-lists/:id',
   validateUuidParam('id'),
+  access.requireOwnedAccess('linkList', 'id'),
   asyncHandler(async (req, res) => {
     const list = await knowledge.getLinkList(req.params.id);
     res.json({ linkList: list, items: await knowledge.listLinkListItems(req.params.id) });
@@ -176,6 +181,7 @@ router.get(
 router.post(
   '/link-lists/:id/items',
   validateUuidParam('id'),
+  access.requireOwnedAccess('linkList', 'id'),
   validateBody(linkListItemsSchema),
   asyncHandler(async (req, res) => {
     res.status(201).json(await knowledge.addLinkListItems(req.params.id, req.validated.urls));
@@ -185,6 +191,7 @@ router.post(
 router.delete(
   '/link-lists/:id',
   validateUuidParam('id'),
+  access.requireOwnedAccess('linkList', 'id'),
   asyncHandler(async (req, res) => {
     res.json(await knowledge.deleteLinkList(req.params.id));
   }),
@@ -194,6 +201,7 @@ router.delete(
 router.post(
   '/link-lists/:id/import',
   validateUuidParam('id'),
+  access.requireOwnedAccess('linkList', 'id'),
   validateBody(importLinkListSchema),
   asyncHandler(async (req, res) => {
     const result = await knowledge.importLinkList(req.params.id, {
@@ -211,7 +219,7 @@ router.get(
   '/projects/:projectId/collections',
   validateUuidParam('projectId'),
   asyncHandler(async (req, res) => {
-    await projects.requireProject(req.params.projectId);
+    await access.assertProject(req.user, req.params.projectId);
     res.json({ collections: await knowledge.listCollections(req.params.projectId) });
   }),
 );
@@ -221,7 +229,7 @@ router.post(
   validateUuidParam('projectId'),
   validateBody(createCollectionSchema),
   asyncHandler(async (req, res) => {
-    await projects.requireProject(req.params.projectId);
+    await access.assertProject(req.user, req.params.projectId);
     const collection = await knowledge.createCollection(req.params.projectId, {
       name: req.validated.name,
       description: req.validated.description || null,
@@ -233,6 +241,7 @@ router.post(
 router.get(
   '/collections/:id',
   validateUuidParam('id'),
+  access.requireOwnedAccess('collection', 'id'),
   asyncHandler(async (req, res) => {
     const collection = await knowledge.getCollection(req.params.id);
     res.json({ collection, items: await knowledge.getCollectionItems(req.params.id) });
@@ -242,6 +251,7 @@ router.get(
 router.patch(
   '/collections/:id',
   validateUuidParam('id'),
+  access.requireOwnedAccess('collection', 'id'),
   validateBody(updateCollectionSchema),
   asyncHandler(async (req, res) => {
     res.json({ collection: await knowledge.updateCollection(req.params.id, req.validated) });
@@ -251,6 +261,7 @@ router.patch(
 router.delete(
   '/collections/:id',
   validateUuidParam('id'),
+  access.requireOwnedAccess('collection', 'id'),
   asyncHandler(async (req, res) => {
     res.json(await knowledge.deleteCollection(req.params.id));
   }),
@@ -259,6 +270,7 @@ router.delete(
 router.post(
   '/collections/:id/items',
   validateUuidParam('id'),
+  access.requireOwnedAccess('collection', 'id'),
   validateBody(collectionItemsSchema),
   asyncHandler(async (req, res) => {
     const added = await knowledge.addCollectionItems(req.params.id, {
@@ -272,6 +284,7 @@ router.post(
 router.delete(
   '/collections/:id/items/:itemId',
   validateUuidParam('id'),
+  access.requireOwnedAccess('collection', 'id'),
   validateUuidParam('itemId'),
   asyncHandler(async (req, res) => {
     res.json(await knowledge.removeCollectionItem(req.params.id, req.params.itemId));
@@ -292,7 +305,7 @@ router.get(
     }),
   ),
   asyncHandler(async (req, res) => {
-    await projects.requireProject(req.params.projectId);
+    await access.assertProject(req.user, req.params.projectId);
     res.json({ crawlJobs: await knowledge.listCrawlJobs(req.params.projectId, req.validatedQuery || {}) });
   }),
 );
@@ -300,6 +313,7 @@ router.get(
 router.post(
   '/crawl-jobs/:id/retry',
   validateUuidParam('id'),
+  access.requireOwnedAccess('crawlJob', 'id'),
   asyncHandler(async (req, res) => {
     res.status(202).json(await knowledge.retryCrawlJob(req.params.id));
   }),

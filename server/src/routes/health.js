@@ -2,6 +2,7 @@
 
 const express = require('express');
 const { asyncHandler } = require('../middleware/errorHandler');
+const { requireAuth } = require('../middleware/auth');
 const { query, dbKind } = require('../db');
 const { status: migrationStatus } = require('../db/migrate');
 const { config } = require('../config/env');
@@ -10,6 +11,7 @@ const { listLlmProviders } = require('../llm');
 const { listEmbeddingProviders } = require('../embeddings');
 const { supportedExtensions } = require('../ingestion/parsers');
 const { workerStatus } = require('../ingestion/worker');
+const access = require('../services/access');
 
 const router = express.Router();
 
@@ -31,24 +33,46 @@ router.get(
   }),
 );
 
-/** Full system status used by the dashboard and the Settings page. */
+/**
+ * System status used by the dashboard and the Settings page.
+ *
+ * Administrators see deployment details (database, migrations, providers).
+ * Normal users get only what their UI needs, and the counts are restricted to
+ * the projects they own.
+ */
 router.get(
   '/system/status',
-  asyncHandler(async (_req, res) => {
-    const migrations = await migrationStatus();
-    const embeddings = await embeddingIndexStatus();
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const admin = access.isAdmin(req.user);
+    const projectIds = await access.allowedProjectIds(req.user, { activeOnly: false });
+
+    let migrations = null;
+    let embeddings = null;
+    if (admin) {
+      migrations = await migrationStatus();
+      embeddings = await embeddingIndexStatus();
+    }
+
     const modelCounts = await query(
       `SELECT
-         (SELECT COUNT(*)::int FROM projects WHERE status = 'active') AS projects,
-         (SELECT COUNT(*)::int FROM documents WHERE NOT archived) AS documents,
-         (SELECT COUNT(*)::int FROM document_chunks) AS chunks,
-         (SELECT COUNT(*)::int FROM conversations WHERE NOT archived) AS conversations,
-         (SELECT COUNT(*)::int FROM ingestion_jobs WHERE status IN ('queued','processing')) AS active_jobs`,
+         (SELECT COUNT(*)::int FROM projects WHERE id = ANY($1::uuid[]) AND status = 'active') AS projects,
+         (SELECT COUNT(*)::int FROM documents WHERE NOT archived AND project_id = ANY($1::uuid[])) AS documents,
+         (SELECT COUNT(*)::int FROM document_chunks WHERE project_id = ANY($1::uuid[])) AS chunks,
+         (SELECT COUNT(*)::int FROM conversations WHERE NOT archived AND project_id = ANY($1::uuid[])) AS conversations,
+         (SELECT COUNT(*)::int FROM ingestion_jobs WHERE status IN ('queued','processing') AND project_id = ANY($1::uuid[])) AS active_jobs`,
+      [projectIds],
     );
+
     res.json({
       app: { name: 'Global Softel RAG Chat', version: '1.0.0', nodeEnv: config.nodeEnv },
-      database: { backend: migrations.backend, applied: migrations.applied, pending: migrations.pending },
-      embeddings,
+      viewer: { role: req.user.role },
+      ...(admin
+        ? {
+            database: { backend: migrations.backend, applied: migrations.applied, pending: migrations.pending },
+            embeddings,
+          }
+        : {}),
       worker: workerStatus(),
       hostedAi: {
         disabled: config.disableHostedAi,
@@ -64,8 +88,7 @@ router.get(
       },
       counts: modelCounts.rows[0],
       supportedExtensions: supportedExtensions(),
-      llmProviders: listLlmProviders(),
-      embeddingProviders: listEmbeddingProviders(),
+      ...(admin ? { llmProviders: listLlmProviders(), embeddingProviders: listEmbeddingProviders() } : {}),
     });
   }),
 );

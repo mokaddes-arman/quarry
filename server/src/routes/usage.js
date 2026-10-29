@@ -6,8 +6,13 @@ const { asyncHandler } = require('../middleware/errorHandler');
 const { validateQuery } = require('../middleware/validate');
 const usage = require('../services/usage');
 const providersService = require('../services/providers');
+const { requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
+
+// Model usage is deployment-wide (tokens, cost across every project), so it is
+// administrator-only. The path prefix keeps the gate local to this router.
+router.use('/model-usage', requireAdmin);
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 

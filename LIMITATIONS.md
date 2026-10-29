@@ -17,7 +17,7 @@
 - Backend: Node/Express (CommonJS), PostgreSQL + pgvector **or** embedded PGlite.
 - Frontend: React + Vite + Tailwind.
 - LLM providers that may answer questions: **OpenRouter** and **Groq** only.
-- Verified green: 109 backend tests · 14 e2e tests · 8/8 RAG eval (all offline).
+- Verified green: 165 backend tests · 20 e2e tests · 8/8 RAG eval (all offline).
 
 ---
 
@@ -52,8 +52,9 @@
   uploaded files. *Work on it:* back up `storage/` (or use `pg_dump` for PostgreSQL); add scripts.
 - [ ] **B3 — Local filesystem only (Low).** No S3/object storage; uploads and artefacts live
   under `storage/`. *Work on it:* storage service under `server/src/services/`.
-- [ ] **B4 — 50 MB upload cap by default (Low).** Controlled by `MAX_UPLOAD_SIZE_MB=50`.
-  *Work on it:* raise it in `.env` if needed.
+- [x] **B4 — Upload cap is 20 MB (resolved).** Controlled by `MAX_UPLOAD_SIZE_MB=20`
+  (lowered from 50 MB to keep a single request bounded).
+  *Work on it:* keep it in `.env`; rejected files report `file_too_large`.
 - [ ] **B5 — No retention/cleanup policy (Low).** Archived documents and finished jobs
   accumulate; nothing purges them. *Work on it:* add a maintenance script.
 
@@ -151,14 +152,18 @@
 
 ## F. Security & multi-user
 
-- [ ] **F1 — No authentication/authorization (High if exposed).** The app is single-user and
-  binds to localhost by default. Anyone who can reach the port can use it with full access.
-  Do **not** set `HOST=0.0.0.0` without adding auth first.
-  *Work on it:* `server/src/app.js` + new auth middleware.
-- [ ] **F2 — No rate limiting on this API (Medium).** Only upstream provider 429s are handled;
-  nothing throttles local requests. *Work on it:* add rate-limit middleware.
-- [ ] **F3 — No audit log (Medium).** Uploads, deletes and provider edits are not recorded for
-  later review. *Work on it:* add an events table.
+- [x] **F1 — Authentication & per-user isolation (resolved).** Passwordless magic-link
+  sign-in, HttpOnly session cookies, administrator and normal-user roles, and per-owner
+  project isolation enforced in the route guards and list queries. Foreign resources return
+  404. Intended for a small internal team; there is still no SSO/OIDC or per-project sharing.
+  *Owner:* `server/src/middleware/auth.js`, `services/access.js`, `services/users.js`.
+- [ ] **F2 — Rate limiting is auth-only (Medium).** Sign-in/token endpoints are throttled per
+  IP and per address; ordinary API calls and uploads are not. Behind a reverse proxy every
+  client shares the proxy's address (`trust proxy` is off), so the per-IP limits become
+  global. *Work on it:* extend `rateLimit` to project/document endpoints and make proxy trust
+  configurable if the server is exposed beyond localhost.
+- [ ] **F3 — No audit log (Medium).** Uploads, deletes, sign-ins and provider edits are not
+  recorded for later review. *Work on it:* add an events table.
 - [ ] **F4 — Prompt-injection defence is best-effort (Medium).** Evidence is wrapped in explicit
   blocks and the prompt forbids following embedded instructions, but a model can still be
   influenced. *Work on it:* `server/src/llm/prompt.js`.
@@ -166,8 +171,13 @@
   provider. They are encrypted at rest and never logged or returned. *Work on it:* accept.
 - [ ] **F6 — CORS allow-list defaults to dev origins (Low).** Fine for the Vite setup;
   production single-origin needs no CORS. *Work on it:* `CORS_ORIGIN` in `.env`.
-- [ ] **F7 — No CSRF protection (Low).** No cookies/sessions are used, so classic CSRF does not
-  apply — but there is also no auth to protect. *Work on it:* revisit together with F1.
+- [x] **F7 — CSRF protection (resolved).** Unsafe methods require a same-origin
+  `Origin`/`Referer` (or `Sec-Fetch-Site`), and session cookies are `SameSite=Lax`.
+  *Owner:* `server/src/middleware/auth.js` (`csrfGuard`).
+- [x] **F8 — Public-REST exposure on Supabase (resolved).** Migration
+  `007_lockdown_public.sql` revokes `anon`/`authenticated` grants, removes default
+  privileges and enables deny-by-default RLS on `public`; the README also says to remove
+  `public` from the Exposed schemas list. Re-run it after adding tables to `public`.
 
 ## G. Product / UX scope
 
@@ -181,8 +191,10 @@
   only by the README. *Work on it:* add `/api/v1` + a spec.
 - [ ] **G5 — Logs only, no metrics (Low).** Observable through pino logs; no Prometheus/OTel.
   *Work on it:* add metrics.
-- [ ] **G6 — No collaboration/multi-user (Medium).** No sharing, roles, or concurrent editing.
-  *Work on it:* depends on F1.
+- [x] **G6 — Multi-user accounts (partially resolved).** Administrators can create/disable
+  users and each user gets an isolated workspace. There is still no project sharing,
+  per-project roles, or concurrent editing. *Work on it:* add project membership if sharing
+  is needed.
 - [ ] **G7 — No export of answers/citations (Low).** A conversation or report cannot be
   downloaded. *Work on it:* add an export endpoint/button.
 - [ ] **G8 — No in-app feedback/eval loop (Low).** No thumbs up/down to capture which answers

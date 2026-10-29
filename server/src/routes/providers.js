@@ -7,6 +7,8 @@ const { validateBody, validateUuidParam } = require('../middleware/validate');
 const providers = require('../services/providers');
 const { listLlmProviders } = require('../llm');
 const { listEmbeddingProviders } = require('../embeddings');
+const { requireAdmin } = require('../middleware/auth');
+const access = require('../services/access');
 
 const router = express.Router();
 
@@ -55,12 +57,30 @@ router.get('/providers/metadata', (_req, res) => {
 });
 
 // --- LLM configurations -----------------------------------------------------
+// Any signed-in user may see which models are available (that powers the model
+// selector in chat), but only safe fields. Creating, editing and testing
+// configurations is administrator-only.
 router.get(
   '/providers/llm',
-  asyncHandler(async (_req, res) => {
-    res.json({ configs: await providers.listLlmConfigs() });
+  asyncHandler(async (req, res) => {
+    const configs = await providers.listLlmConfigs();
+    if (access.isAdmin(req.user)) return res.json({ configs });
+    return res.json({
+      configs: configs.map((c) => ({
+        id: c.id,
+        name: c.name,
+        provider: c.provider,
+        model: c.model,
+        enabled: c.enabled,
+        is_default_chat: c.is_default_chat,
+      })),
+    });
   }),
 );
+
+// Everything below configures providers (API keys, embedding models, tests).
+// The path prefix keeps the gate local to this router.
+router.use('/providers', requireAdmin);
 
 router.post(
   '/providers/llm',

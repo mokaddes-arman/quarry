@@ -12,7 +12,7 @@ const { newId } = require('../lib/ids');
 const { query } = require('../db');
 const storage = require('../lib/storage');
 const documents = require('../services/documents');
-const projects = require('../services/projects');
+const access = require('../services/access');
 const parsers = require('../ingestion/parsers');
 
 const router = express.Router();
@@ -43,9 +43,9 @@ const duplicateQuery = z.object({ onDuplicate: z.enum(['skip', 'new_version', 'n
 router.post(
   '/projects/:projectId/documents/upload',
   validateUuidParam('projectId'),
+  access.requireProjectAccess('projectId'),
   upload.array('files', 25),
   asyncHandler(async (req, res) => {
-    await projects.requireProject(req.params.projectId);
     const files = req.files || [];
     if (!files.length) {
       throw new AppError('No files were received. Attach files under the "files" field.', { code: Codes.BAD_REQUEST, status: 400 });
@@ -91,10 +91,10 @@ router.post(
 router.post(
   '/documents/:id/versions',
   validateUuidParam('id'),
+  access.requireOwnedAccess('document', 'id'),
   upload.array('files', 1),
   asyncHandler(async (req, res) => {
-    const doc = await documents.getDocumentRow(req.params.id);
-    if (!doc) throw new AppError('Document not found.', { code: Codes.NOT_FOUND, status: 404 });
+    const doc = req.resource;
     const files = req.files || [];
     if (!files.length) throw new AppError('No file was received.', { code: Codes.BAD_REQUEST, status: 400 });
     const registered = await documents.registerUpload({
@@ -109,6 +109,7 @@ router.post(
 router.get(
   '/documents/:id',
   validateUuidParam('id'),
+  access.requireOwnedAccess('document', 'id'),
   asyncHandler(async (req, res) => {
     res.json({ document: await documents.getDocumentWithVersions(req.params.id) });
   }),
@@ -117,6 +118,7 @@ router.get(
 router.delete(
   '/documents/:id',
   validateUuidParam('id'),
+  access.requireOwnedAccess('document', 'id'),
   validateQuery(z.object({ permanent: booleanQuery() })),
   asyncHandler(async (req, res) => {
     const permanent = Boolean(req.validatedQuery?.permanent);
@@ -127,6 +129,7 @@ router.delete(
 router.post(
   '/documents/:id/restore',
   validateUuidParam('id'),
+  access.requireOwnedAccess('document', 'id'),
   asyncHandler(async (req, res) => {
     res.json(await documents.restoreDocument(req.params.id));
   }),
@@ -135,6 +138,7 @@ router.post(
 router.post(
   '/documents/:id/reindex',
   validateUuidParam('id'),
+  access.requireOwnedAccess('document', 'id'),
   validateBody(z.object({ versionId: z.string().uuid().optional().nullable() })),
   asyncHandler(async (req, res) => {
     res.status(202).json(await documents.reindexDocument(req.params.id, { versionId: req.validated.versionId || null }));
@@ -144,6 +148,7 @@ router.post(
 router.post(
   '/documents/:id/activate-version',
   validateUuidParam('id'),
+  access.requireOwnedAccess('document', 'id'),
   validateBody(z.object({ versionId: z.string().uuid() })),
   asyncHandler(async (req, res) => {
     res.json(await documents.activateVersion(req.params.id, req.validated.versionId));
@@ -154,6 +159,7 @@ router.post(
 router.get(
   '/documents/:id/file',
   validateUuidParam('id'),
+  access.requireOwnedAccess('document', 'id'),
   validateQuery(z.object({ versionId: z.string().uuid().optional(), download: z.coerce.boolean().optional() })),
   asyncHandler(async (req, res) => {
     const doc = await documents.getDocumentWithVersions(req.params.id);
@@ -190,6 +196,7 @@ router.get(
 router.get(
   '/documents/:id/markdown',
   validateUuidParam('id'),
+  access.requireOwnedAccess('document', 'id'),
   validateQuery(z.object({ versionId: z.string().uuid().optional() })),
   asyncHandler(async (req, res) => {
     const result = await documents.buildDocumentMarkdown(req.params.id, {
@@ -202,6 +209,7 @@ router.get(
 router.get(
   '/documents/:id/markdown/download',
   validateUuidParam('id'),
+  access.requireOwnedAccess('document', 'id'),
   validateQuery(z.object({ versionId: z.string().uuid().optional() })),
   asyncHandler(async (req, res) => {
     const result = await documents.buildDocumentMarkdown(req.params.id, {
@@ -218,6 +226,7 @@ router.get(
 router.get(
   '/chunks/:id',
   validateUuidParam('id'),
+  access.requireOwnedAccess('chunk', 'id'),
   asyncHandler(async (req, res) => {
     const { rows } = await query(
       `SELECT c.id, c.content, c.chunk_index, c.token_count, c.char_count, c.metadata, c.created_at,
@@ -237,6 +246,7 @@ router.get(
 router.post(
   '/jobs/:id/retry',
   validateUuidParam('id'),
+  access.requireOwnedAccess('ingestionJob', 'id'),
   asyncHandler(async (req, res) => {
     res.status(202).json(await documents.retryJob(req.params.id));
   }),

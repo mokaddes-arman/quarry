@@ -174,6 +174,18 @@ async function getWebLink(id) {
  * the whole batch.
  */
 async function createWebLinks(projectId, rawUrls, { collectionId = null, linkListId = null, title = null } = {}) {
+  // A link can only be filed under a collection/list that belongs to the same
+  // project. Without this check a user could attach their link to somebody
+  // else's collection id.
+  if (collectionId) {
+    const { rows } = await query('SELECT id FROM collections WHERE id = $1 AND project_id = $2', [collectionId, projectId]);
+    if (!rows[0]) throw new AppError('Collection not found.', { code: Codes.NOT_FOUND, status: 404 });
+  }
+  if (linkListId) {
+    const { rows } = await query('SELECT id FROM link_lists WHERE id = $1 AND project_id = $2', [linkListId, projectId]);
+    if (!rows[0]) throw new AppError('Link list not found.', { code: Codes.NOT_FOUND, status: 404 });
+  }
+
   const list = Array.isArray(rawUrls) ? rawUrls : [rawUrls];
   const created = [];
   const errors = [];

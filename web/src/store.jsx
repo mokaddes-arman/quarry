@@ -70,6 +70,91 @@ export function AppProvider({ children }) {
   const askSeqRef = useRef(0);
   const toast = useToast();
 
+  // --- authentication ---------------------------------------------------------
+  // `user` is null while signed out. Everything that fetches project data waits
+  // for it, so a signed-out page never sends a burst of unauthenticated calls.
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authError, setAuthError] = useState(null);
+  const [authInfo, setAuthInfo] = useState({ setupRequired: false, emailConfigured: false });
+
+  const refreshAuth = useCallback(async () => {
+    try {
+      const data = await api.authStatus();
+      setUser(data.user || null);
+      setAuthInfo({
+        setupRequired: Boolean(data.setupRequired),
+        emailConfigured: Boolean(data.emailConfigured),
+      });
+      setAuthError(null);
+      return data;
+    } catch (err) {
+      setUser(null);
+      setAuthError(err);
+      return null;
+    } finally {
+      setAuthLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshAuth();
+  }, [refreshAuth]);
+
+  // Any API call that comes back 401 means the session expired or was revoked.
+  useEffect(() => {
+    const onUnauthorised = () => {
+      setUser(null);
+      setProjects([]);
+      setSystemStatus(null);
+      setConversations([]);
+      setActiveConversationId(null);
+      setMessages([]);
+      setMessageSources([]);
+      setAsk(null);
+    };
+    window.addEventListener('rag:unauthorized', onUnauthorised);
+    return () => window.removeEventListener('rag:unauthorized', onUnauthorised);
+  }, []);
+
+  const login = useCallback(
+    async (token) => {
+      const data = await api.verifyLogin(token);
+      setUser(data.user);
+      setAuthInfo((prev) => ({ ...prev, setupRequired: false }));
+      setView('chat');
+      return data.user;
+    },
+    [],
+  );
+
+  const requestLoginLink = useCallback((email) => api.requestLoginLink(email), []);
+
+  const setupFirstAdmin = useCallback(async ({ email, name }) => {
+    const data = await api.setupAdmin({ email, name });
+    setAuthInfo((prev) => ({ ...prev, setupRequired: false }));
+    return data;
+  }, []);
+
+  const logout = useCallback(async () => {
+    try {
+      await api.logout();
+    } catch {
+      /* the local state is cleared regardless */
+    }
+    setUser(null);
+    setView('chat');
+    setProjects([]);
+    setProjectsLoading(false);
+    setSystemStatus(null);
+    setConversations([]);
+    setActiveConversationId(null);
+    setMessages([]);
+    setMessageSources([]);
+    setAsk(null);
+    localStorage.removeItem(PROJECT_KEY);
+  }, []);
+
   // --- theme -----------------------------------------------------------------
   useEffect(() => {
     applyTheme(theme);
@@ -110,8 +195,15 @@ export function AppProvider({ children }) {
   }, []);
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      setProjects([]);
+      setProjectsError(null);
+      setProjectsLoading(false);
+      return;
+    }
     refreshProjects().catch(() => {});
-  }, [refreshProjects]);
+  }, [authLoading, user, refreshProjects]);
 
   // Keep the active project valid as the list changes. Wait until the list has
   // actually loaded, otherwise a page reload would clear the persisted choice
@@ -358,13 +450,28 @@ export function AppProvider({ children }) {
   }, []);
 
   useEffect(() => {
+    if (!user) {
+      setSystemStatus(null);
+      return undefined;
+    }
     refreshSystemStatus();
     const timer = window.setInterval(refreshSystemStatus, 20_000);
     return () => window.clearInterval(timer);
-  }, [refreshSystemStatus]);
+  }, [user, refreshSystemStatus]);
 
   const value = useMemo(
     () => ({
+      // authentication
+      user,
+      authLoading,
+      authError,
+      authInfo,
+      refreshAuth,
+      login,
+      logout,
+      requestLoginLink,
+      setupFirstAdmin,
+      isAdmin: user?.role === 'admin',
       projects,
       projectsLoading,
       projectsError,
@@ -391,6 +498,15 @@ export function AppProvider({ children }) {
       refreshSystemStatus,
     }),
     [
+      user,
+      authLoading,
+      authError,
+      authInfo,
+      refreshAuth,
+      login,
+      logout,
+      requestLoginLink,
+      setupFirstAdmin,
       projects,
       projectsLoading,
       projectsError,
