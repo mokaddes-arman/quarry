@@ -167,22 +167,19 @@ router.get(
     const version = wanted ? doc.versions.find((v) => v.id === wanted) : doc.versions.find((v) => v.id === doc.current_version_id);
     if (!version) throw new AppError('No stored file for that version.', { code: Codes.NOT_FOUND, status: 404 });
 
-    const absolute = storage.resolveStoredPath(version.storage_path);
-    if (!storage.fileExists(version.storage_path)) {
-      throw new AppError('The stored file is missing from disk.', { code: Codes.NOT_FOUND, status: 410 });
+    if (!(await storage.fileExists(version.storage_path))) {
+      throw new AppError('The stored file is missing from storage.', { code: Codes.NOT_FOUND, status: 410 });
     }
+    // Reads go through the adapter so this route works identically for local
+    // disk and a private Supabase bucket. Authorization already ran above.
+    const body = await storage.readStoredFile(version.storage_path, config.maxUploadSizeMb * 1024 * 1024);
     const safeName = storage.sanitiseFilename(version.original_filename);
     res.setHeader('Content-Disposition', `${req.validatedQuery?.download ? 'attachment' : 'inline'}; filename="${safeName}"`);
-    if (version.mime_type) res.type(version.mime_type);
-    // `dotfiles: 'allow'` is safe here: the path was already confined to the
-    // storage root by resolveStoredPath() and the filename was sanitised, and
-    // the storage root itself may legitimately live in a dotted directory.
-    res.sendFile(absolute, { dotfiles: 'allow' }, (err) => {
-      if (err) {
-        req.log?.error({ err: err.message, code: err.code, absolute }, 'failed to send stored file');
-        if (!res.headersSent) res.status(500).json({ error: { code: 'file_read_failed', message: 'Could not read the stored file.' } });
-      }
-    });
+    res.setHeader('Content-Length', String(body.length));
+    // Match the old sendFile() behaviour by deriving the type from the file
+    // extension; uploads sometimes arrive as application/octet-stream.
+    res.type(path.extname(version.original_filename) || version.mime_type || 'application/octet-stream');
+    res.send(body);
   }),
 );
 

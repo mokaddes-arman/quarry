@@ -71,11 +71,10 @@ test('onboarding offers a first project and creates one', async ({ page }) => {
   await dialog.getByRole('button', { name: 'Create project' }).click();
   await expect(dialog).toBeHidden();
 
-  // The new project becomes active: the chat header shows it and the composer
-  // is ready for a question.
-  await expect(page.getByRole('heading', { name: 'New conversation' })).toBeVisible();
-  // The chat header confirms the new project is active. Scope to <main> so the
-  // hidden <option> of the sidebar project <select> cannot match.
+  // A new project lands on Documents so the upload step is the obvious next
+  // action, and the header confirms which project is active. Scope to <main>
+  // so the hidden <option> of the sidebar project <select> cannot match.
+  await expect(page.getByRole('heading', { name: 'Documents' })).toBeVisible();
   await expect(page.getByRole('main').locator('header').first()).toContainText(projectName);
-  await expect(page.getByPlaceholder(/Ask a question/)).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Upload documents' })).toBeVisible();
 });

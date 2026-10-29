@@ -12,8 +12,8 @@ const { normaliseExt } = require('../ingestion/parsers/util');
 
 /**
  * Document lifecycle: store an upload safely, detect duplicates by content
- * hash, create versions, and queue ingestion. Files always live on the
- * filesystem; the database only keeps relative paths.
+ * hash, create versions, and queue ingestion. Bytes live behind the storage
+ * adapter; the database only keeps relative object keys.
  */
 
 const DUPLICATE_ACTIONS = new Set(['skip', 'new_version', 'new_document']);
@@ -41,6 +41,12 @@ async function inspectTempFile(tempPath, originalFilename) {
   }
   const sha256 = await storage.computeFileHash(tempPath);
   return { ext, size, sha256 };
+}
+
+async function getProjectOwnerId(projectId) {
+  const { rows } = await query('SELECT owner_user_id FROM projects WHERE id = $1', [projectId]);
+  if (!rows[0]) throw new AppError('Project not found.', { code: Codes.NOT_FOUND, status: 404 });
+  return rows[0].owner_user_id;
 }
 
 async function findVersionsByHash(projectId, sha256) {
@@ -89,6 +95,7 @@ async function registerUpload({ projectId, file, onDuplicate = 'skip', title, do
     throw new AppError(`Unknown duplicate action "${onDuplicate}".`, { code: Codes.VALIDATION, status: 400 });
   }
 
+  const ownerUserId = await getProjectOwnerId(projectId);
   const originalFilename = storage.sanitiseFilename(file.originalname);
   let meta;
   try {
@@ -130,6 +137,7 @@ async function registerUpload({ projectId, file, onDuplicate = 'skip', title, do
   const versionId = newId();
   const jobId = newId();
   const relativePath = storage.buildRelativePath({
+    ownerUserId,
     projectId,
     documentId: targetDocumentId,
     versionNumber,
@@ -206,7 +214,7 @@ async function registerUpload({ projectId, file, onDuplicate = 'skip', title, do
     notifyWorker();
     return result;
   } catch (err) {
-    await fsp.unlink(storage.resolveStoredPath(relativePath)).catch(() => {});
+    await storage.deleteStoredFile(relativePath).catch(() => {});
     throw err;
   }
 }
@@ -280,9 +288,13 @@ async function deleteDocument(id, { permanent = false } = {}) {
 
   if (permanent) {
     // Remove the database records first (cascades to versions, chunks, jobs
-    // and message_sources references), then the files on disk.
+    // and message_sources references), then every stored object for the
+    // document. Explicit paths cover projects whose ownership was reassigned.
+    const { rows: versions } = await query('SELECT storage_path FROM document_versions WHERE document_id = $1', [id]);
+    const ownerUserId = await getProjectOwnerId(doc.project_id);
     await query('DELETE FROM documents WHERE id = $1', [id]);
-    await storage.removeVersionDirectory(doc.project_id, doc.id).catch(() => {});
+    await Promise.allSettled(versions.map((version) => storage.deleteStoredFile(version.storage_path)));
+    await storage.removeVersionDirectory(doc.project_id, doc.id, ownerUserId).catch(() => {});
     return { deleted: true, permanent: true, id };
   }
 

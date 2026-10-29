@@ -19,8 +19,16 @@ fs.mkdirSync(base, { recursive: true });
 const uniq = `${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
 process.env.NODE_ENV = 'test';
 process.env.LOG_LEVEL = 'silent';
+// Always use throwaway PGlite, local storage and no SMTP, regardless of the
+// developer's .env. Empty values take precedence because dotenv does not
+// overwrite keys that already exist.
+process.env.DATABASE_URL = '';
+process.env.SMTP_HOST = '';
 process.env.PGLITE_DIR = path.join(base, `pg-${uniq}`);
 process.env.STORAGE_DIR = path.join(base, `store-${uniq}`);
+process.env.SUPABASE_URL = '';
+process.env.SUPABASE_SERVICE_ROLE_KEY = '';
+process.env.SUPABASE_STORAGE_BUCKET = '';
 process.env.HF_HOME = path.join(base, 'models');
 process.env.DEFAULT_EMBEDDING_PROVIDER = 'hash';
 process.env.DEFAULT_EMBEDDING_MODEL = 'hash-384';

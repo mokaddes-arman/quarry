@@ -123,7 +123,7 @@ Express API (CommonJS) ── Zod validation, narrow CORS, security headers
    └── LLM provider registry (OpenRouter / Groq - OpenAI-compatible)
          streaming via Server-Sent Events
 
-Storage: local filesystem (originals + artefacts)
+Storage: local filesystem or private Supabase Storage (originals)
 Database: PostgreSQL + pgvector  (or embedded PGlite + pgvector)
 ```
 
@@ -176,11 +176,14 @@ break account creation.
 
 **Isolation.** `projects.owner_user_id` decides visibility. A normal user can only read or
 change their own projects and everything hanging off them (documents, versions, chunks,
-conversations, links, link lists, collections, jobs). Foreign resources return **404**, not
-403, so the API never confirms that somebody else's data exists. Cross-project search is
-filtered to the caller's own projects. Global configuration (providers, settings, model
-usage, user management) is administrator-only; the only non-admin exception is the personal
-`ui_theme` preference and the read-only model list used by the chat selector.
+links, link lists, collections, jobs). Foreign resources return **404**, not 403, so the API
+never confirms that somebody else's data exists. Conversations also record the user who
+created them: a user only sees their own chats, while an administrator sees every chat in the
+workspace. That means an administrator can review a user's conversations, but chats the
+administrator starts in that user's project stay private to administrators. Cross-project
+search is filtered to the caller's own projects. Global configuration (providers, settings,
+model usage, user management) is administrator-only; the only non-admin exception is the
+personal `ui_theme` preference and the read-only model list used by the chat selector.
 
 ### Supabase / hosted Postgres: lock down the public schema
 
@@ -210,6 +213,35 @@ Also do this once in the Supabase dashboard:
 Run the migration again after adding any table to `public`, or enable RLS on it manually.
 `npm run check` verifies the result on a live host: it fails if `anon`/`authenticated`
 still hold table privileges or if any table in `public` has RLS disabled.
+
+### Supabase Storage (recommended on Render)
+
+Render's free tier has an ephemeral disk, so files under `STORAGE_DIR` disappear on redeploy.
+Set all three Supabase Storage variables to keep uploaded documents in a private bucket:
+
+```bash
+SUPABASE_URL=https://<project-ref>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<server-only service-role key>
+SUPABASE_STORAGE_BUCKET=rag-documents
+```
+
+Create the bucket as **private**. The app talks to the Supabase Storage REST API with the
+service-role key from the server only; it never sends the key to the browser and never exposes a
+public bucket URL. Downloads still go through `GET /api/documents/:id/file`, so the existing
+project/user authorization checks apply before any bytes are read.
+
+Object keys include the owner, project and document ids:
+
+```text
+<owner-user-id>/<project-id>/<document-id>/v<version>__<filename>
+```
+
+Permanent document deletion and project deletion remove the corresponding objects. If any of
+the three variables is missing, the app uses `STORAGE_DIR` (local disk) as before, which is the
+default for development and tests.
+
+**Never** put `SUPABASE_SERVICE_ROLE_KEY` in the web app, a `VITE_*` variable, a public config
+endpoint, or source control. Rotate it immediately if it is exposed.
 
 ### The Documents page: "Upload documents" and "View documents"
 
@@ -319,7 +351,10 @@ The most important ones:
 | `DATABASE_URL` | Real PostgreSQL + pgvector. **Empty → embedded PGlite.** | *(empty)* |
 | `PGLITE_DIR` | Embedded database directory. | `./storage/pgdata` |
 | `APP_MASTER_KEY` | 32+ char key that encrypts provider keys at rest. | *(must set)* |
-| `STORAGE_DIR` | Uploaded files and artefacts. | `./storage` |
+| `STORAGE_DIR` | Local upload/temp directory; originals live there only when Supabase Storage is not configured. | `./storage` |
+| `SUPABASE_URL` | Supabase project URL; set with the two variables below to enable remote storage. | *(empty)* |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-only service-role key for the private storage bucket. Never expose to the browser. | *(empty)* |
+| `SUPABASE_STORAGE_BUCKET` | Private bucket name for original uploads. | *(empty)* |
 | `MAX_UPLOAD_SIZE_MB` | Per-file upload cap. | `20` |
 | `ADMIN_EMAIL` | First administrator, created on boot when the user table is empty. | *(empty)* |
 | `APP_PUBLIC_URL` | Public origin used in emailed sign-in links. | *(request host)* |

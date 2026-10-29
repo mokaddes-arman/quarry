@@ -130,6 +130,56 @@ describe('resource isolation', () => {
     await h.requestAs(alice.id).delete(`/api/conversations/${conversationId}`).expect(404);
   });
 
+  it('keeps administrator conversations private from the project owner', async () => {
+    const aliceChat = await h.requestAs(alice.id)
+      .post(`/api/projects/${aliceProject.id}/conversations`)
+      .send({ title: 'Alice private chat' })
+      .expect(201);
+    const adminChat = await h.request(h.getApp())
+      .post(`/api/projects/${aliceProject.id}/conversations`)
+      .send({ title: 'Admin private chat' })
+      .expect(201);
+
+    const aliceId = aliceChat.body.conversation.id;
+    const adminId = adminChat.body.conversation.id;
+
+    // The project owner sees only their own conversation.
+    const aliceList = await h.requestAs(alice.id)
+      .get(`/api/projects/${aliceProject.id}/conversations`)
+      .expect(200);
+    expect(aliceList.body.conversations.map((c) => c.id)).toEqual([aliceId]);
+
+    // The administrator still sees both, including the user's chat.
+    const adminList = await h.request(h.getApp())
+      .get(`/api/projects/${aliceProject.id}/conversations`)
+      .expect(200);
+    expect(adminList.body.conversations.map((c) => c.id)).toEqual(
+      expect.arrayContaining([aliceId, adminId]),
+    );
+    await h.request(h.getApp()).get(`/api/conversations/${aliceId}`).expect(200);
+
+    // Dashboard stats and workspace counts must not reveal the admin's chat.
+    const aliceStats = await h.requestAs(alice.id).get(`/api/projects/${aliceProject.id}/stats`).expect(200);
+    expect(aliceStats.body.stats.conversations.total_conversations).toBe(1);
+    expect(aliceStats.body.stats.recentConversations.map((c) => c.id)).toEqual([aliceId]);
+
+    const aliceStatus = await h.requestAs(alice.id).get('/api/system/status').expect(200);
+    expect(aliceStatus.body.counts.conversations).toBe(1);
+
+    const adminStats = await h.request(h.getApp()).get(`/api/projects/${aliceProject.id}/stats`).expect(200);
+    expect(adminStats.body.stats.conversations.total_conversations).toBe(2);
+
+    // The admin's chat is invisible to the user on every conversation surface.
+    await h.requestAs(alice.id).get(`/api/conversations/${adminId}`).expect(404);
+    await h.requestAs(alice.id).get(`/api/conversations/${adminId}/messages`).expect(404);
+    await h.requestAs(alice.id)
+      .post(`/api/conversations/${adminId}/messages`)
+      .send({ question: 'hi', stream: false })
+      .expect(404);
+    await h.requestAs(alice.id).patch(`/api/conversations/${adminId}`).send({ title: 'x' }).expect(404);
+    await h.requestAs(alice.id).delete(`/api/conversations/${adminId}`).expect(404);
+  });
+
   it('hides foreign collections and link lists', async () => {
     const collection = await h.requestAs(bob.id)
       .post(`/api/projects/${bobProject.id}/collections`)

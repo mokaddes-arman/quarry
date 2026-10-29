@@ -100,7 +100,12 @@ async function deleteProject(id, { user = null } = {}) {
 }
 
 /** Project dashboard statistics, all computed from real data. */
-async function projectStats(projectId) {
+async function projectStats(projectId, { user = null } = {}) {
+  const params = [projectId];
+  // A normal user's dashboard must not reveal an administrator's conversation
+  // titles (or even their count) in the same project.
+  const conversationOwner =
+    user && user.role !== 'admin' ? ` AND owner_user_id = $${params.push(user.id)}` : '';
   const { rows } = await query(
     `
     WITH doc_stats AS (
@@ -120,7 +125,7 @@ async function projectStats(projectId) {
     conv_stats AS (
       SELECT COUNT(*) AS total_conversations,
              COUNT(*) FILTER (WHERE updated_at > now() - interval '7 days') AS recent_conversations
-      FROM conversations WHERE project_id = $1 AND archived = false
+      FROM conversations WHERE project_id = $1 AND archived = false${conversationOwner}
     ),
     job_stats AS (
       SELECT COUNT(*) FILTER (WHERE status = 'queued') AS queued_jobs,
@@ -139,7 +144,7 @@ async function projectStats(projectId) {
     ),
     recent_conversations AS (
       SELECT id, title, updated_at, created_at FROM conversations
-      WHERE project_id = $1 AND archived = false ORDER BY updated_at DESC LIMIT 8
+      WHERE project_id = $1 AND archived = false${conversationOwner} ORDER BY updated_at DESC LIMIT 8
     ),
     storage AS (
       SELECT COALESCE(SUM(size_bytes), 0) AS total_bytes FROM document_versions WHERE project_id = $1
@@ -154,7 +159,7 @@ async function projectStats(projectId) {
       (SELECT COALESCE(json_agg(row_to_json(recent_conversations)), '[]'::json) FROM recent_conversations) AS recent_conversations,
       (SELECT row_to_json(storage) FROM storage) AS storage
     `,
-    [projectId],
+    params,
   );
   const r = rows[0] || {};
   return {

@@ -35,6 +35,18 @@ function applyTheme(theme) {
   document.documentElement.classList.toggle('dark', dark);
 }
 
+/**
+ * Drop the `/login` path (and its one-time token) once a session is active.
+ * Without this the address bar keeps showing `/login` while the user works in
+ * Chat, Documents and the other views, because view changes do not navigate.
+ */
+function clearLoginPath() {
+  const match = window.location.pathname.match(/^(.*?)\/login\/?$/i);
+  if (!match) return;
+  const base = match[1] || '/';
+  window.history.replaceState(null, '', `${base}${window.location.search}`);
+}
+
 export function AppProvider({ children }) {
   const [projects, setProjects] = useState([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
@@ -100,6 +112,10 @@ export function AppProvider({ children }) {
   useEffect(() => {
     refreshAuth();
   }, [refreshAuth]);
+
+  useEffect(() => {
+    if (user) clearLoginPath();
+  }, [user]);
 
   // Any API call that comes back 401 means the session expired or was revoked.
   useEffect(() => {
@@ -229,13 +245,13 @@ export function AppProvider({ children }) {
     [projects, activeProjectId],
   );
 
-  const selectProject = useCallback((id) => {
+  const selectProject = useCallback((id, nextView = 'chat') => {
     setActiveProjectIdState(id || null);
     if (id) localStorage.setItem(PROJECT_KEY, id);
     else localStorage.removeItem(PROJECT_KEY);
     setActiveConversationId(null);
     setConversations([]);
-    setView('chat');
+    setView(nextView);
     setSidebarOpen(false);
   }, []);
 
@@ -243,7 +259,11 @@ export function AppProvider({ children }) {
     async (body) => {
       const data = await api.createProject(body);
       await refreshProjects();
-      if (data?.project?.id) selectProject(data.project.id);
+      if (data?.project?.id) {
+        // A brand-new project has no knowledge yet. Land on Documents so the
+        // next step is obvious: upload or link something to ask questions about.
+        selectProject(data.project.id, 'documents');
+      }
       return data.project;
     },
     [refreshProjects, selectProject],

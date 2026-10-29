@@ -86,7 +86,7 @@ test('upload a document, ask a question and read the cited answer', async ({ pag
   await dialog.getByPlaceholder('e.g. Platform API Specification').fill(projectName);
   await dialog.getByRole('button', { name: 'Create project' }).click();
   await expect(dialog).toBeHidden();
-  await expect(page.getByRole('heading', { name: 'New conversation' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Documents' })).toBeVisible();
 
   // --- 2. upload a document -------------------------------------------------
   // The Documents page has two sections: "Upload documents" (files + the rest

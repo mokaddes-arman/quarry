@@ -38,7 +38,7 @@ router.get(
  *
  * Administrators see deployment details (database, migrations, providers).
  * Normal users get only what their UI needs, and the counts are restricted to
- * the projects they own.
+ * the projects they own and the conversations they created.
  */
 router.get(
   '/system/status',
@@ -54,14 +54,17 @@ router.get(
       embeddings = await embeddingIndexStatus();
     }
 
+    // Administrators see every conversation; everybody else only their own.
+    const conversationParams = admin ? [projectIds] : [projectIds, req.user.id];
+    const conversationOwner = admin ? '' : ' AND owner_user_id = $2';
     const modelCounts = await query(
       `SELECT
          (SELECT COUNT(*)::int FROM projects WHERE id = ANY($1::uuid[]) AND status = 'active') AS projects,
          (SELECT COUNT(*)::int FROM documents WHERE NOT archived AND project_id = ANY($1::uuid[])) AS documents,
          (SELECT COUNT(*)::int FROM document_chunks WHERE project_id = ANY($1::uuid[])) AS chunks,
-         (SELECT COUNT(*)::int FROM conversations WHERE NOT archived AND project_id = ANY($1::uuid[])) AS conversations,
+         (SELECT COUNT(*)::int FROM conversations WHERE NOT archived AND project_id = ANY($1::uuid[])${conversationOwner}) AS conversations,
          (SELECT COUNT(*)::int FROM ingestion_jobs WHERE status IN ('queued','processing') AND project_id = ANY($1::uuid[])) AS active_jobs`,
-      [projectIds],
+      conversationParams,
     );
 
     res.json({

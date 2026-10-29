@@ -70,6 +70,10 @@ function resolveFromRoot(p, fallback) {
 const nodeEnv = str('NODE_ENV', 'development');
 const isTest = nodeEnv === 'test' || Boolean(process.env.VITEST);
 
+const supabaseUrl = String(str('SUPABASE_URL', '') || '').replace(/\/+$/, '');
+const supabaseServiceRoleKey = str('SUPABASE_SERVICE_ROLE_KEY', '');
+const supabaseStorageBucket = str('SUPABASE_STORAGE_BUCKET', '');
+
 const config = {
   projectRoot: PROJECT_ROOT,
   serverRoot: SERVER_ROOT,
@@ -93,6 +97,15 @@ const config = {
   appMasterKey: str('APP_MASTER_KEY', ''),
   storageDir: resolveFromRoot(str('STORAGE_DIR'), './storage'),
   maxUploadSizeMb: int('MAX_UPLOAD_SIZE_MB', 20),
+
+  // Private Supabase Storage. Enabled only when all three values are present;
+  // otherwise uploads stay on local disk. The service key is server-only.
+  supabaseStorage: {
+    url: supabaseUrl,
+    serviceRoleKey: supabaseServiceRoleKey,
+    bucket: supabaseStorageBucket,
+    enabled: Boolean(supabaseUrl && supabaseServiceRoleKey && supabaseStorageBucket),
+  },
 
   // Absolute base URL used in emailed login links (e.g. https://rag.example.com).
   // When empty, the origin of the request that triggered the invitation is used.

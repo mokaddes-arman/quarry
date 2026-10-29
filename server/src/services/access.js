@@ -5,8 +5,10 @@
  *
  * A project has exactly one owner. Normal users may only touch their own
  * projects and everything that hangs off them; administrators may touch
- * everything. Foreign resources are reported as 404 (not 403) so the API never
- * confirms that somebody else's document, conversation or link exists.
+ * everything. Conversations additionally belong to the user who created them,
+ * so an administrator's chats in a user's project stay invisible to that user.
+ * Foreign resources are reported as 404 (not 403) so the API never confirms
+ * that somebody else's document, conversation or link exists.
  *
  * Route-level guards are the primary enforcement point. List queries also take
  * the actor so a missed guard cannot silently widen a result set.
@@ -83,6 +85,7 @@ const OWNED = {
   },
   conversation: {
     sql: 'SELECT c.* FROM conversations c JOIN projects p ON p.id = c.project_id WHERE c.id = $1',
+    ownerColumn: 'c.owner_user_id',
     label: 'Conversation not found.',
   },
   link: {
@@ -115,7 +118,7 @@ async function assertOwned(kind, user, id) {
   const params = [id];
   let ownerClause = '';
   if (!isAdmin(user)) {
-    ownerClause = ' AND p.owner_user_id = $2';
+    ownerClause = ` AND ${spec.ownerColumn || 'p.owner_user_id'} = $2`;
     params.push(user.id);
   }
   const { rows } = await query(`${spec.sql}${ownerClause}`, params);

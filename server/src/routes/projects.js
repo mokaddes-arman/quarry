@@ -105,8 +105,13 @@ router.delete(
   asyncHandler(async (req, res) => {
     const project = req.project;
     const { rows } = await require('../db').query('SELECT id FROM documents WHERE project_id = $1', [project.id]);
+    const { rows: versions } = await require('../db').query(
+      'SELECT storage_path FROM document_versions WHERE project_id = $1',
+      [project.id],
+    );
+    await Promise.allSettled(versions.map((version) => storage.deleteStoredFile(version.storage_path)));
     for (const doc of rows) {
-      await storage.removeVersionDirectory(project.id, doc.id).catch(() => {});
+      await storage.removeVersionDirectory(project.id, doc.id, project.owner_user_id).catch(() => {});
     }
     await projects.deleteProject(project.id);
     res.json({ deleted: true, id: project.id });
@@ -117,7 +122,7 @@ router.get(
   '/:id/stats',
   validateUuidParam('id'),
   asyncHandler(async (req, res) => {
-    res.json({ stats: await projects.projectStats(req.project.id) });
+    res.json({ stats: await projects.projectStats(req.project.id, { user: req.user }) });
   }),
 );
 
@@ -153,7 +158,12 @@ router.get(
     }),
   ),
   asyncHandler(async (req, res) => {
-    res.json({ conversations: await conversations.listConversations(req.project.id, req.validatedQuery || {}) });
+    res.json({
+      conversations: await conversations.listConversations(req.project.id, {
+        ...(req.validatedQuery || {}),
+        user: req.user,
+      }),
+    });
   }),
 );
 

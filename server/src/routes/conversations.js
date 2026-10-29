@@ -56,7 +56,10 @@ router.post(
     }),
   ),
   asyncHandler(async (req, res) => {
-    const conversation = await conversations.createConversation(req.params.projectId, req.validated);
+    const conversation = await conversations.createConversation(req.params.projectId, {
+      ...req.validated,
+      ownerUserId: req.user.id,
+    });
     res.status(201).json({ conversation });
   }),
 );

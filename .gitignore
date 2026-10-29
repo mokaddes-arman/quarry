@@ -30,6 +30,9 @@ service-account*.json
 storage/
 data/
 server/storage/
+# Source code for the storage adapters is not local runtime data.
+!server/src/services/storage/
+!server/src/services/storage/**
 .cache/
 models/
 uploads/
