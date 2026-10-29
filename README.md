@@ -315,7 +315,7 @@ The most important ones:
 
 | Variable | Purpose | Default |
 | --- | --- | --- |
-| `HOST` / `PORT` | Bind address / port (localhost by default). | `127.0.0.1` / `3001` |
+| `HOST` / `PORT` | Bind address / port (all interfaces by default; set `HOST=127.0.0.1` for local-only). Render sets `PORT` automatically. | `0.0.0.0` / `3001` |
 | `DATABASE_URL` | Real PostgreSQL + pgvector. **Empty → embedded PGlite.** | *(empty)* |
 | `PGLITE_DIR` | Embedded database directory. | `./storage/pgdata` |
 | `APP_MASTER_KEY` | 32+ char key that encrypts provider keys at rest. | *(must set)* |
@@ -488,7 +488,8 @@ Streaming answers emit Server-Sent Events: `status`, `retrieval`, `sources`, `to
 
 ## Security model
 
-- **Localhost only by default** (`HOST=127.0.0.1`); narrow CORS allow-list; strict security
+- **All interfaces by default** (`HOST=0.0.0.0`) so container hosts such as Render can reach
+  the server; set `HOST=127.0.0.1` for local-only. Narrow CORS allow-list; strict security
   headers; no `x-powered-by`.
 - **Passwordless authentication:** single-use emailed sign-in links, SHA-256-hashed tokens,
   HttpOnly `SameSite=Lax` session cookies, same-origin enforcement for unsafe methods

@@ -3,8 +3,8 @@
 /**
  * Server entry point.
  * Boots the database, applies migrations, starts the in-process ingestion
- * worker and begins listening. Binds to HOST (localhost by default) so the
- * application is not exposed to the network unless explicitly configured.
+ * worker and begins listening. Binds to HOST (all interfaces by default so it
+ * works on container hosts such as Render; set HOST=127.0.0.1 for local-only).
  */
 require('./config/env');
 const { config, ensureRuntimeDirs, getMasterKey } = require('./config/env');

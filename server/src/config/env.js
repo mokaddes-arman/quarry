@@ -78,7 +78,7 @@ const config = {
   isTest,
   isProduction: nodeEnv === 'production',
 
-  host: str('HOST', '127.0.0.1'),
+  host: str('HOST', '0.0.0.0'),
   port: int('PORT', 3001),
   logLevel: str('LOG_LEVEL', isTest ? 'silent' : 'info'),
   corsOrigins: list('CORS_ORIGIN', [
