@@ -55,7 +55,7 @@ describe('storage: Supabase REST adapter', () => {
     );
     expect(options.method).toBe('POST');
     expect(options.headers.apikey).toBe(SETTINGS.serviceRoleKey);
-    expect(options.headers.authorization).toBe(`Bearer ${SETTINGS.serviceRoleKey}`);
+    expect(options.headers.authorization).toBeUndefined();
     expect(options.headers['x-upsert']).toBe('true');
     expect(Buffer.isBuffer(options.body)).toBe(true);
     expect(options.body.toString('utf8')).toBe('hello');
@@ -76,7 +76,36 @@ describe('storage: Supabase REST adapter', () => {
     const [url, options] = fetchImpl.mock.calls[0];
     expect(url).toContain('/storage/v1/object/rag-documents/');
     expect(options.method).toBe('GET');
-    expect(options.headers.authorization).toBe(`Bearer ${SETTINGS.serviceRoleKey}`);
+    expect(options.headers.authorization).toBeUndefined();
+    expect(options.headers.apikey).toBe(SETTINGS.serviceRoleKey);
+  });
+
+  it('includes the truncated Supabase error detail in failed requests', async () => {
+    const longDetail = 'x'.repeat(250);
+    const fetchImpl = vi.fn().mockResolvedValue(
+      response({ ok: false, status: 500, json: { error: { message: longDetail } } }),
+    );
+    const storage = createSupabaseStorage({ ...SETTINGS, fetchImpl });
+
+    await expect(storage.readStoredFile('user-1/project-1/document-1/v1__a.txt', 1024)).rejects.toThrow(
+      `Supabase Storage download failed (500): ${'x'.repeat(200)}.`,
+    );
+  });
+
+  it('sends secret keys via the apikey header and legacy JWTs via bearer', async () => {
+    const secretFetchImpl = vi.fn().mockResolvedValue(response({ ok: true, status: 200, body: Buffer.from('ok') }));
+    const secretStorage = createSupabaseStorage({ ...SETTINGS, serviceRoleKey: 'sb_secret_abc', fetchImpl: secretFetchImpl });
+    await secretStorage.readStoredFile('user-1/project-1/document-1/v1__a.txt', 1024);
+
+    expect(secretFetchImpl.mock.calls[0][1].headers.apikey).toBe('sb_secret_abc');
+    expect(secretFetchImpl.mock.calls[0][1].headers.authorization).toBeUndefined();
+
+    const jwtFetchImpl = vi.fn().mockResolvedValue(response({ ok: true, status: 200, body: Buffer.from('ok') }));
+    const jwtStorage = createSupabaseStorage({ ...SETTINGS, serviceRoleKey: 'eyJhbGciOiJIUzI1NiJ9.payload.sig', fetchImpl: jwtFetchImpl });
+    await jwtStorage.readStoredFile('user-1/project-1/document-1/v1__a.txt', 1024);
+
+    expect(jwtFetchImpl.mock.calls[0][1].headers.apikey).toBe('eyJhbGciOiJIUzI1NiJ9.payload.sig');
+    expect(jwtFetchImpl.mock.calls[0][1].headers.authorization).toBe(`Bearer eyJhbGciOiJIUzI1NiJ9.payload.sig`);
   });
 
   it('treats missing objects as absent and reports oversized reads', async () => {

@@ -3,6 +3,7 @@
 const fsp = require('node:fs/promises');
 const { config } = require('../../config/env');
 const { AppError, Codes } = require('../../lib/errors');
+const { logger } = require('../../lib/logger');
 const { assertStorageKey } = require('./paths');
 
 /**
@@ -15,6 +16,7 @@ const { assertStorageKey } = require('./paths');
 const kind = 'supabase';
 const REQUEST_TIMEOUT_MS = 30_000;
 const LIST_LIMIT = 1000;
+const MAX_ERROR_DETAIL_CHARS = 200;
 
 function createSupabaseStorage({ url, serviceRoleKey, bucket, fetchImpl = fetch }) {
   if (!url || !serviceRoleKey || !bucket) {
@@ -24,13 +26,38 @@ function createSupabaseStorage({ url, serviceRoleKey, bucket, fetchImpl = fetch 
   const baseUrl = String(url).replace(/\/+$/, '');
   const bucketName = String(bucket);
   const serviceKey = String(serviceRoleKey);
+  const usesLegacyJwt = serviceKey.startsWith('eyJ');
+  const authStyle = usesLegacyJwt ? 'apikey+authorization_bearer_jwt' : 'apikey';
+
+  function truncateText(value) {
+    const text = value == null ? '' : String(value);
+    return text.length > MAX_ERROR_DETAIL_CHARS ? text.slice(0, MAX_ERROR_DETAIL_CHARS) : text;
+  }
+
+  async function readErrorDetail(res) {
+    const payload = await res.json().catch(() => null);
+    const raw = payload && (typeof payload.error === 'string' ? payload.error : payload.error?.message || payload.message);
+    return truncateText(raw);
+  }
+
+  async function failRequest({ action, res, objectKey = null, fallbackMessage, fallbackStatus }) {
+    const detail = await readErrorDetail(res);
+    const errorMessage = fallbackMessage || `Supabase Storage ${action} failed (${res.status})${detail ? `: ${detail}` : ''}.`;
+    logger.error(
+      { bucket: bucketName, objectKey, authStyle, action, status: res.status, detail },
+      `Supabase Storage ${action} failed`,
+    );
+    throw new AppError(errorMessage, {
+      code: fallbackStatus ? (fallbackStatus === 410 ? Codes.NOT_FOUND : fallbackStatus) : 'storage_error',
+      status: fallbackStatus || 502,
+      details: { action, status: res.status, detail },
+    });
+  }
 
   function authHeaders(extra = {}) {
-    return {
-      apikey: serviceKey,
-      authorization: `Bearer ${serviceKey}`,
-      ...extra,
-    };
+    const headers = { apikey: serviceKey };
+    if (usesLegacyJwt) headers.authorization = `Bearer ${serviceKey}`;
+    return { ...headers, ...extra };
   }
 
   function objectUrl(key) {
@@ -45,16 +72,13 @@ function createSupabaseStorage({ url, serviceRoleKey, bucket, fetchImpl = fetch 
     return `${baseUrl}/storage/v1/object/list/${encodeURIComponent(bucketName)}`;
   }
 
-  async function send(target, options, action) {
+  async function send(target, options, action, objectKey = null) {
     const res = await fetchImpl(target, {
       ...options,
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
     if (!res.ok) {
-      throw new AppError(`Supabase Storage ${action} failed (${res.status}).`, {
-        code: 'storage_error',
-        status: 502,
-      });
+      await failRequest({ action, res, objectKey });
     }
     return res;
   }
@@ -73,6 +97,7 @@ function createSupabaseStorage({ url, serviceRoleKey, bucket, fetchImpl = fetch 
         body,
       },
       'upload',
+      relativePath,
     );
     await fsp.unlink(tempPath).catch(() => {});
     return key;
@@ -86,13 +111,16 @@ function createSupabaseStorage({ url, serviceRoleKey, bucket, fetchImpl = fetch 
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
     if (res.status === 400 || res.status === 404) {
-      throw new AppError('The stored file is missing from storage.', { code: Codes.NOT_FOUND, status: 410 });
+      await failRequest({
+        action: 'download',
+        res,
+        objectKey: key,
+        fallbackMessage: 'The stored file is missing from storage.',
+        fallbackStatus: 410,
+      });
     }
     if (!res.ok) {
-      throw new AppError(`Supabase Storage download failed (${res.status}).`, {
-        code: 'storage_error',
-        status: 502,
-      });
+      await failRequest({ action: 'download', res, objectKey: key });
     }
 
     const declared = Number(res.headers.get('content-length') || 0);
@@ -121,10 +149,7 @@ function createSupabaseStorage({ url, serviceRoleKey, bucket, fetchImpl = fetch 
     });
     if (res.ok) return true;
     if (res.status === 400 || res.status === 404) return false;
-    throw new AppError(`Supabase Storage existence check failed (${res.status}).`, {
-      code: 'storage_error',
-      status: 502,
-    });
+    await failRequest({ action: 'existence check', res, objectKey: key });
   }
 
   async function deleteStoredFile(relativePath) {
@@ -137,10 +162,7 @@ function createSupabaseStorage({ url, serviceRoleKey, bucket, fetchImpl = fetch 
     });
     if (res.ok) return true;
     if (res.status === 400 || res.status === 404) return false;
-    throw new AppError(`Supabase Storage delete failed (${res.status}).`, {
-      code: 'storage_error',
-      status: 502,
-    });
+    await failRequest({ action: 'delete', res, objectKey: key });
   }
 
   async function listObjects(prefix) {
@@ -160,6 +182,7 @@ function createSupabaseStorage({ url, serviceRoleKey, bucket, fetchImpl = fetch 
           }),
         },
         'list',
+        prefix,
       );
       const items = await res.json();
       if (!Array.isArray(items) || !items.length) break;
