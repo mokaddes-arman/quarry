@@ -61,29 +61,33 @@ function InviteResult({ invite, email, onClose }) {
   return (
     <div className="space-y-3">
       <p className="text-sm">
-        Account created for <span className="font-medium">{email}</span>.
+        One-time link for <span className="font-medium">{email}</span>.
       </p>
       {invite.emailSent ? (
         <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
-          A sign-in link was emailed to them. It expires {formatRelative(invite.expiresAt)}.
+          The link was emailed to them. It expires {formatRelative(invite.expiresAt)}. You can also
+          copy it below and share it directly.
         </p>
       ) : (
-        <div className="space-y-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-          <p className="flex items-start gap-2">
-            <AlertIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <span>
-              Email is not configured or sending failed, so share this one-time link with the user
-              yourself. It expires {formatRelative(invite.expiresAt)}.
-            </span>
+        <p className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+          <AlertIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            Email is not configured or sending failed. Share this one-time link with the user
+            yourself. It expires {formatRelative(invite.expiresAt)}.
+          </span>
+        </p>
+      )}
+      {invite.loginUrl && (
+        <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-950/40">
+          <p className="break-all rounded bg-white/80 p-2 font-mono text-[11px] dark:bg-slate-900/60">
+            {invite.loginUrl}
           </p>
-          {invite.loginUrl && (
-            <>
-              <p className="break-all rounded bg-white/60 p-2 font-mono text-[11px] dark:bg-slate-900/60">
-                {invite.loginUrl}
-              </p>
-              <CopyButton value={invite.loginUrl} />
-            </>
-          )}
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              Single use · only share it with this user.
+            </p>
+            <CopyButton value={invite.loginUrl} />
+          </div>
         </div>
       )}
       <div className="flex justify-end">
@@ -117,6 +121,11 @@ export function AdminView() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [reassignTo, setReassignTo] = useState('');
   const [deleting, setDeleting] = useState(false);
+
+  const [projectTarget, setProjectTarget] = useState(null);
+  const [projectRows, setProjectRows] = useState([]);
+  const [projectsLoading, setProjectsLoading] = useState(false);
+  const [projectBusyId, setProjectBusyId] = useState(null);
 
   const load = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoading(true);
@@ -198,6 +207,7 @@ export function AdminView() {
     try {
       const data = await api.adminResendInvite(target.id);
       setResendResult({
+        title: 'Sign-in link',
         email: target.email,
         invite: {
           emailSent: data.emailSent,
@@ -210,6 +220,58 @@ export function AdminView() {
       toast.error(err.message);
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const sendPasswordReset = async (target) => {
+    setBusyId(target.id);
+    try {
+      const data = await api.adminSendPasswordReset(target.id);
+      setResendResult({
+        title: 'Password reset link',
+        email: target.email,
+        invite: {
+          emailSent: data.emailSent,
+          loginUrl: data.loginUrl,
+          expiresAt: data.expiresAt,
+        },
+      });
+      await load({ silent: true });
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const openProjects = async (target) => {
+    setProjectTarget(target);
+    setProjectsLoading(true);
+    setProjectRows([]);
+    try {
+      const data = await api.adminUserProjects(target.id);
+      setProjectRows(data.projects || []);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setProjectsLoading(false);
+    }
+  };
+
+  const toggleProject = async (project, checked) => {
+    if (!projectTarget) return;
+    setProjectBusyId(project.id);
+    try {
+      const data = checked
+        ? await api.adminAssignProjects(projectTarget.id, [project.id])
+        : await api.adminUnassignProject(projectTarget.id, project.id);
+      setProjectRows(data.projects || []);
+      toast.success(checked ? 'Project access granted.' : 'Project access removed.');
+      await load({ silent: true });
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setProjectBusyId(null);
     }
   };
 
@@ -255,7 +317,8 @@ export function AdminView() {
               <ShieldIcon className="h-5 w-5 text-blue-600" /> Administration
             </h1>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Manage who can use this workspace. Each user only sees the projects they create.
+              Manage who can use this workspace. Each user sees the projects they own or that you
+              assign to them.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -393,6 +456,20 @@ export function AdminView() {
                                 <MailIcon className="h-3.5 w-3.5" /> Send link
                               </Button>
                             )}
+                            {u.status !== 'disabled' && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={busy}
+                                title="Send a link that lets this user choose a new password"
+                                onClick={() => sendPasswordReset(u)}
+                              >
+                                Reset password
+                              </Button>
+                            )}
+                            <Button size="sm" variant="ghost" disabled={busy} onClick={() => openProjects(u)}>
+                              <UsersIcon className="h-3.5 w-3.5" /> Projects
+                            </Button>
                             {u.status === 'disabled' ? (
                               <Button size="sm" variant="ghost" disabled={busy} onClick={() => patchUser(u, { status: 'active' })}>
                                 Enable
@@ -510,7 +587,7 @@ export function AdminView() {
           setInviteResult(null);
           setResendResult(null);
         }}
-        title={inviteResult ? 'Account created' : 'Sign-in link'}
+        title={inviteResult ? 'Account created' : resendResult?.title || 'Sign-in link'}
       >
         <InviteResult
           invite={(inviteResult || resendResult)?.invite}
@@ -520,6 +597,83 @@ export function AdminView() {
             setResendResult(null);
           }}
         />
+      </Modal>
+
+      {/* Project assignment */}
+      <Modal
+        open={Boolean(projectTarget)}
+        onClose={() => {
+          setProjectTarget(null);
+          setProjectRows([]);
+        }}
+        title="Project access"
+        footer={
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setProjectTarget(null);
+              setProjectRows([]);
+            }}
+          >
+            Done
+          </Button>
+        }
+      >
+        {projectTarget && (
+          <div className="space-y-3">
+            <p className="text-sm">
+              Choose which projects <span className="font-medium">{projectTarget.email}</span> can
+              open. Changes take effect immediately.
+            </p>
+            {projectsLoading ? (
+              <div className="flex items-center gap-2 py-6 text-sm text-slate-500">
+                <Spinner /> Loading projects…
+              </div>
+            ) : projectRows.length === 0 ? (
+              <p className="rounded-md border border-slate-200 px-3 py-4 text-center text-xs text-slate-500 dark:border-slate-700">
+                No projects exist yet. Create one first, then come back to assign it.
+              </p>
+            ) : (
+              <div className="max-h-72 space-y-1 overflow-y-auto rounded-md border border-slate-200 p-2 dark:border-slate-700">
+                {projectRows.map((project) => {
+                  const checked = Boolean(project.owned || project.assigned);
+                  const busy = projectBusyId === project.id;
+                  return (
+                    <label
+                      key={project.id}
+                      className={cn(
+                        'flex items-center gap-3 rounded-md px-2 py-2 text-sm',
+                        checked ? 'bg-blue-50 dark:bg-blue-950/30' : 'hover:bg-slate-50 dark:hover:bg-slate-800/60',
+                        project.owned ? 'cursor-default' : 'cursor-pointer',
+                        busy && 'opacity-60',
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        checked={checked}
+                        disabled={project.owned || busy}
+                        onChange={(e) => toggleProject(project, e.target.checked)}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium">{project.name}</span>
+                        <span className="block text-[11px] text-slate-500 dark:text-slate-400">
+                          {project.status}
+                        </span>
+                      </span>
+                      {project.owned && <Badge tone="blue">Owner</Badge>}
+                      {!project.owned && project.assigned && <Badge tone="green">Assigned</Badge>}
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              An owner always keeps access. Assigned users can read documents and chat in the
+              project, but only the owner can rename or delete it.
+            </p>
+          </div>
+        )}
       </Modal>
 
       {/* Delete user */}

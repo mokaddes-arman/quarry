@@ -1,15 +1,17 @@
 'use strict';
 
 /**
- * Accounts, passwordless login links and sessions.
+ * Accounts, passwordless login links, password resets and sessions.
  *
  * Security properties this module guarantees:
  *   - a token or session id is only ever stored as a SHA-256 hash;
  *   - login links are single use and expire (AUTH_TOKEN_TTL_MINUTES);
  *   - issuing a new link invalidates the previous unused ones for that user;
  *   - disabled users cannot complete a sign-in and their sessions stop working;
- *   - the last remaining administrator cannot be demoted, disabled or deleted.
+ *   - the last remaining administrator cannot be demoted, disabled or deleted;
+ *   - passwords are stored only as scrypt:<salt>:<hash> and never in plain text.
  */
+const crypto = require('node:crypto');
 const { query, withTransaction } = require('../db');
 const { AppError, Codes } = require('../lib/errors');
 const { newId, randomToken, sha256 } = require('../lib/ids');
@@ -18,7 +20,15 @@ const { logger } = require('../lib/logger');
 const mailer = require('./mailer');
 
 const USER_COLUMNS = `id, email, name, role, status, created_by, last_login_at, created_at, updated_at`;
+const USER_COLUMNS_WITH_HASH = `${USER_COLUMNS}, password_hash`;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Passwords are verified with scrypt (memory-hard, slow by design) and stored
+// as `scrypt:<salt>:<derived key>`. The salt is a random hex string, the key a
+// hex digest - the whole string is opaque and never the password itself.
+const PASSWORD_ALGO = 'scrypt';
+const PASSWORD_KEY_LENGTH = 64;
 
 function normaliseEmail(value) {
   return String(value || '').trim().toLowerCase();
@@ -36,6 +46,56 @@ function displayName(name, email) {
   const clean = String(name || '').trim();
   return clean ? clean.slice(0, 120) : String(email || '').split('@')[0];
 }
+
+/* -------------------------------------------------------------------------- */
+/* Password hashing                                                           */
+/* -------------------------------------------------------------------------- */
+
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const derived = crypto.scryptSync(String(password), salt, PASSWORD_KEY_LENGTH).toString('hex');
+  return `${PASSWORD_ALGO}:${salt}:${derived}`;
+}
+
+function verifyPassword(password, stored) {
+  if (!stored) return false;
+  const [algo, salt, expected] = String(stored).split(':');
+  if (algo !== PASSWORD_ALGO || !salt || !expected) return false;
+  const actual = crypto.scryptSync(String(password), salt, PASSWORD_KEY_LENGTH);
+  const expectedBuf = Buffer.from(expected, 'hex');
+  const actualBuf = Buffer.from(actual);
+  if (expectedBuf.length !== actualBuf.length) return false;
+  return crypto.timingSafeEqual(expectedBuf, actualBuf);
+}
+
+function validatePassword(password) {
+  const value = String(password ?? '');
+  if (value.length < 8) {
+    throw new AppError('Password must be at least 8 characters long.', { code: Codes.VALIDATION, status: 422 });
+  }
+  if (value.length > 128) {
+    throw new AppError('Password must be at most 128 characters long.', { code: Codes.VALIDATION, status: 422 });
+  }
+  return value;
+}
+
+// Always run one scrypt verification, even for unknown addresses, so response
+// timing cannot be used to find out which email addresses have accounts.
+const DUMMY_PASSWORD_HASH = hashPassword(crypto.randomBytes(24).toString('hex'));
+
+/** Fetch a user together with the password hash (never leave the hash out). */
+async function getUserWithPasswordHash(email) {
+  const { rows } = await query(`SELECT ${USER_COLUMNS_WITH_HASH} FROM users WHERE email_normalised = $1`, [
+    normaliseEmail(email),
+  ]);
+  return rows[0] || null;
+}
+
+async function getUserWithPasswordHashById(id) {
+  const { rows } = await query(`SELECT ${USER_COLUMNS_WITH_HASH} FROM users WHERE id = $1`, [id]);
+  return rows[0] || null;
+}
+
 
 function publicUser(row) {
   if (!row) return null;
@@ -86,6 +146,7 @@ async function listUsers({ search, status, role } = {}) {
   const { rows } = await query(
     `SELECT u.id, u.email, u.name, u.role, u.status, u.created_by, u.last_login_at, u.created_at, u.updated_at,
             (SELECT COUNT(*)::int FROM projects p WHERE p.owner_user_id = u.id) AS project_count,
+            (SELECT COUNT(*)::int FROM user_projects up WHERE up.user_id = u.id) AS assigned_project_count,
             (SELECT MAX(s.last_seen_at) FROM auth_sessions s WHERE s.user_id = u.id AND s.expires_at > now()) AS last_seen_at
      FROM users u
      WHERE ${conditions.join(' AND ')}
@@ -249,6 +310,74 @@ async function deleteUser(id, { actorId = null, reassignTo = null } = {}) {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Project assignment                                                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Every project together with whether this user owns it or has been assigned
+ * to it. The admin UI uses the flags to show the current access in one list.
+ */
+async function listUserProjects(userId) {
+  const user = await getUser(userId);
+  if (!user) throw new AppError('User not found.', { code: Codes.NOT_FOUND, status: 404 });
+  const { rows } = await query(
+    `SELECT p.id, p.name, p.slug, p.status,
+            (p.owner_user_id = $1) AS owned,
+            (up.user_id IS NOT NULL) AS assigned,
+            up.created_at AS assigned_at
+       FROM projects p
+       LEFT JOIN user_projects up ON up.project_id = p.id AND up.user_id = $1
+      ORDER BY p.name ASC`,
+    [userId],
+  );
+  return rows;
+}
+
+/** Grant a user access to one or more projects (idempotent). */
+async function assignUserProjects(userId, { projectIds = [], actorId = null } = {}) {
+  const user = await getUser(userId);
+  if (!user) throw new AppError('User not found.', { code: Codes.NOT_FOUND, status: 404 });
+
+  const ids = [...new Set((Array.isArray(projectIds) ? projectIds : []).map((id) => String(id || '').trim()).filter(Boolean))];
+  if (!ids.length) return { assigned: 0, projectIds: [] };
+  if (ids.length > 500) {
+    throw new AppError('Too many projects selected at once.', { code: Codes.VALIDATION, status: 422 });
+  }
+  if (ids.some((id) => !UUID_RE.test(id))) {
+    throw new AppError('One or more project ids are invalid.', { code: Codes.VALIDATION, status: 422 });
+  }
+
+  const { rows: found } = await query('SELECT id FROM projects WHERE id = ANY($1::uuid[])', [ids]);
+  if (found.length !== ids.length) {
+    throw new AppError('One or more projects could not be found.', { code: Codes.NOT_FOUND, status: 404 });
+  }
+
+  await query(
+    `INSERT INTO user_projects (user_id, project_id, assigned_by)
+     SELECT $1, p.id, $3 FROM projects p WHERE p.id = ANY($2::uuid[])
+     ON CONFLICT (user_id, project_id) DO UPDATE SET assigned_by = EXCLUDED.assigned_by`,
+    [userId, ids, actorId],
+  );
+  return { assigned: ids.length, projectIds: ids };
+}
+
+/** Revoke an assignment. Ownership is untouched and always keeps access. */
+async function unassignUserProject(userId, projectId) {
+  const user = await getUser(userId);
+  if (!user) throw new AppError('User not found.', { code: Codes.NOT_FOUND, status: 404 });
+  if (!UUID_RE.test(String(projectId || ''))) {
+    throw new AppError('Invalid project id.', { code: Codes.VALIDATION, status: 422 });
+  }
+  const { rows } = await query('SELECT id, owner_user_id FROM projects WHERE id = $1', [projectId]);
+  if (!rows[0]) throw new AppError('Project not found.', { code: Codes.NOT_FOUND, status: 404 });
+  if (rows[0].owner_user_id === userId) {
+    throw new AppError('This user owns the project, so access cannot be removed.', { code: Codes.CONFLICT, status: 409 });
+  }
+  const { rowCount } = await query('DELETE FROM user_projects WHERE user_id = $1 AND project_id = $2', [userId, projectId]);
+  return { removed: rowCount > 0, projectId };
+}
+
+/* -------------------------------------------------------------------------- */
 /* Login links                                                                */
 /* -------------------------------------------------------------------------- */
 
@@ -326,20 +455,85 @@ async function resendLoginLink(id, { origin = null, createdBy = null } = {}) {
   return { user: publicUser(user), ...delivery };
 }
 
-/** Consume a login link and open a session. */
-async function verifyLoginToken(rawToken, { ip = null, userAgent = null } = {}) {
+function cleanToken(rawToken) {
   const token = String(rawToken || '').trim();
   if (!token || token.length > 512) {
     throw new AppError('This sign-in link is invalid.', { code: 'invalid_token', status: 400 });
   }
+  return token;
+}
+
+/**
+ * Describe a link without consuming it, so the sign-in screen can ask the user
+ * to choose a password before the one-time token is exchanged for a session.
+ */
+async function describeLoginToken(rawToken) {
+  const tokenHash = sha256(cleanToken(rawToken));
+  const { rows } = await query(
+    `SELECT t.expires_at, t.used_at, t.purpose, u.email, u.name, u.status
+     FROM auth_login_tokens t
+     JOIN users u ON u.id = t.user_id
+     WHERE t.token_hash = $1`,
+    [tokenHash],
+  );
+  const row = rows[0];
+  if (!row) {
+    throw new AppError('This sign-in link is invalid or has already been used.', { code: 'invalid_token', status: 400 });
+  }
+  if (row.used_at) {
+    throw new AppError('This sign-in link has already been used. Request a new one.', {
+      code: 'invalid_token',
+      status: 400,
+    });
+  }
+  if (new Date(row.expires_at).getTime() <= Date.now()) {
+    throw new AppError('This sign-in link has expired. Request a new one.', { code: 'expired_token', status: 400 });
+  }
+  if (row.status === 'disabled') {
+    throw new AppError('This account has been disabled. Contact an administrator.', {
+      code: 'account_disabled',
+      status: 403,
+    });
+  }
+
+  return {
+    purpose: row.purpose,
+    email: row.email,
+    name: row.name,
+    expiresAt: row.expires_at,
+    // Invitations and password resets are the only links that may set a password.
+    canSetPassword: row.purpose === 'invite' || row.purpose === 'password_reset',
+  };
+}
+
+/** Administrator-initiated password reset link for an existing account. */
+async function sendPasswordResetLink(id, { origin = null, createdBy = null } = {}) {
+  const user = await getUser(id);
+  if (!user) throw new AppError('User not found.', { code: Codes.NOT_FOUND, status: 404 });
+  if (user.status === 'disabled') {
+    throw new AppError('This account is disabled. Enable it before sending a reset link.', {
+      code: Codes.CONFLICT,
+      status: 409,
+    });
+  }
+  const delivery = await deliverLoginLink(user, { origin, purpose: 'password_reset', createdBy });
+  return { user: publicUser(user), ...delivery };
+}
+
+/** Consume a login link and open a session. */
+async function verifyLoginToken(rawToken, { ip = null, userAgent = null, purpose = null, password = null } = {}) {
+  const token = cleanToken(rawToken);
   const tokenHash = sha256(token);
   const sessionToken = randomToken(32);
   const sessionHash = sha256(sessionToken);
-  const expiresAt = new Date(Date.now() + config.auth.sessionDays * 86_400_000);
+  const sessionExpiresAt = new Date(Date.now() + config.auth.sessionDays * 86_400_000);
+  // An empty string means "sign in without setting a password", so only a real
+  // value counts as a password being supplied.
+  const suppliedPassword = password === undefined || password === null || password === '' ? null : String(password);
 
   const result = await withTransaction(async (tx) => {
     const { rows } = await tx.query(
-      `SELECT t.id, t.user_id, t.expires_at, t.used_at, u.email, u.name, u.role, u.status
+      `SELECT t.id, t.user_id, t.expires_at, t.used_at, t.purpose, u.email, u.name, u.role, u.status, u.password_hash
        FROM auth_login_tokens t
        JOIN users u ON u.id = t.user_id
        WHERE t.token_hash = $1
@@ -348,6 +542,9 @@ async function verifyLoginToken(rawToken, { ip = null, userAgent = null } = {}) 
     );
     const tokenRow = rows[0];
     if (!tokenRow) {
+      throw new AppError('This sign-in link is invalid or has already been used.', { code: 'invalid_token', status: 400 });
+    }
+    if (purpose && tokenRow.purpose !== purpose) {
       throw new AppError('This sign-in link is invalid or has already been used.', { code: 'invalid_token', status: 400 });
     }
     if (tokenRow.used_at) {
@@ -366,6 +563,29 @@ async function verifyLoginToken(rawToken, { ip = null, userAgent = null } = {}) 
       });
     }
 
+    const canSetPassword = tokenRow.purpose === 'invite' || tokenRow.purpose === 'password_reset';
+    if (suppliedPassword && !canSetPassword) {
+      throw new AppError('This link cannot be used to set a password. Request a password reset link instead.', {
+        code: 'password_not_allowed',
+        status: 400,
+      });
+    }
+
+    // A user coming from an invitation (or a password reset) may set a password
+    // as part of consuming the link. The hash is written in the same transaction
+    // that consumes the token, so a half-done exchange cannot happen.
+    const wantsPassword = Boolean(suppliedPassword);
+    if (wantsPassword) {
+      const value = validatePassword(suppliedPassword);
+      await tx.query(`UPDATE users SET password_hash = $2, password_updated_at = now() WHERE id = $1`, [
+        tokenRow.user_id,
+        hashPassword(value),
+      ]);
+      // Changing a password signs the account out everywhere else; the session
+      // created below is the only one kept.
+      await tx.query('DELETE FROM auth_sessions WHERE user_id = $1', [tokenRow.user_id]);
+    }
+
     await tx.query('UPDATE auth_login_tokens SET used_at = now() WHERE id = $1', [tokenRow.id]);
     await tx.query(
       `UPDATE users SET status = 'active', last_login_at = now() WHERE id = $1 AND status <> 'disabled'`,
@@ -374,7 +594,7 @@ async function verifyLoginToken(rawToken, { ip = null, userAgent = null } = {}) 
     await tx.query(
       `INSERT INTO auth_sessions (id, user_id, token_hash, user_agent, ip, expires_at)
        VALUES ($1,$2,$3,$4,$5,$6)`,
-      [newId(), tokenRow.user_id, sessionHash, String(userAgent || '').slice(0, 400) || null, String(ip || '').slice(0, 64) || null, expiresAt],
+      [newId(), tokenRow.user_id, sessionHash, String(userAgent || '').slice(0, 400) || null, String(ip || '').slice(0, 64) || null, sessionExpiresAt],
     );
 
     return {
@@ -384,12 +604,57 @@ async function verifyLoginToken(rawToken, { ip = null, userAgent = null } = {}) 
         name: tokenRow.name,
         role: tokenRow.role,
         status: 'active',
+        hasPassword: wantsPassword || Boolean(tokenRow.password_hash),
       },
-      sessionExpiresAt: expiresAt,
+      sessionExpiresAt,
     };
   });
 
   return { ...result, sessionToken };
+}
+
+/**
+ * Email/password sign-in. The error message is deliberately identical for an
+ * unknown address, a wrong password and a disabled account.
+ */
+async function loginWithPassword({ email, password, ip = null, userAgent = null } = {}) {
+  const user = await getUserWithPasswordHash(assertEmail(email));
+  const valid = verifyPassword(String(password ?? ''), user?.password_hash || DUMMY_PASSWORD_HASH);
+  if (!user || !user.password_hash || !valid || user.status === 'disabled') {
+    throw new AppError('The email address or password is incorrect.', {
+      code: 'invalid_credentials',
+      status: 401,
+    });
+  }
+
+  const sessionToken = randomToken(32);
+  const sessionExpiresAt = new Date(Date.now() + config.auth.sessionDays * 86_400_000);
+  await query(
+    `INSERT INTO auth_sessions (id, user_id, token_hash, user_agent, ip, expires_at)
+     VALUES ($1,$2,$3,$4,$5,$6)`,
+    [newId(), user.id, sha256(sessionToken), String(userAgent || '').slice(0, 400) || null, String(ip || '').slice(0, 64) || null, sessionExpiresAt],
+  );
+  await query(`UPDATE users SET status = 'active', last_login_at = now() WHERE id = $1 AND status <> 'disabled'`, [user.id]);
+
+  return {
+    user: { ...publicUser(user), status: 'active', hasPassword: true },
+    sessionToken,
+    sessionExpiresAt,
+  };
+}
+
+/**
+ * Start the forgot-password flow. The response is intentionally identical for
+ * known and unknown addresses so this endpoint cannot enumerate accounts.
+ */
+async function requestPasswordReset({ email, origin = null, createdBy = null } = {}) {
+  const user = await getUserByEmail(assertEmail(email)).catch(() => null);
+  if (user && user.status !== 'disabled') {
+    await deliverLoginLink(user, { origin, purpose: 'password_reset', createdBy });
+  } else {
+    logger.info({ email: normaliseEmail(email) }, 'password reset requested for an unknown or disabled address');
+  }
+  return { ok: true };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -496,7 +761,14 @@ module.exports = {
   issueLoginToken,
   deliverLoginLink,
   resendLoginLink,
+  sendPasswordResetLink,
+  describeLoginToken,
   verifyLoginToken,
+  loginWithPassword,
+  requestPasswordReset,
+  listUserProjects,
+  assignUserProjects,
+  unassignUserProject,
   getSession,
   revokeSession,
   revokeAllSessions,

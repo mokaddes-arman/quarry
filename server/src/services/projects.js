@@ -3,20 +3,27 @@
 const { query, withTransaction } = require('../db');
 const { AppError, Codes } = require('../lib/errors');
 const { slugify, slugSuffix } = require('../lib/ids');
+const { projectAccessClause } = require('./access');
 
 const PROJECT_COLUMNS = `id, name, slug, description, instructions, status, settings, owner_user_id, created_at, updated_at`;
 
+/** Mutating a project (rename, archive, delete) is reserved for its owner. */
 function ownerFilter(user, params) {
   if (!user || user.role === 'admin') return '';
   return `owner_user_id = $${params.push(user.id)}`;
+}
+
+/** Reading a project is allowed to its owner and to every assigned user. */
+function readFilter(user, params) {
+  return projectAccessClause(user, params, 'projects');
 }
 
 async function listProjects({ includeArchived = false, user = null } = {}) {
   const conditions = [];
   const params = [];
   if (!includeArchived) conditions.push("status = 'active'");
-  const owner = ownerFilter(user, params);
-  if (owner) conditions.push(owner);
+  const scope = readFilter(user, params);
+  if (scope) conditions.push(scope);
   const { rows } = await query(
     `SELECT ${PROJECT_COLUMNS} FROM projects
      ${conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''}
@@ -28,12 +35,24 @@ async function listProjects({ includeArchived = false, user = null } = {}) {
 
 async function getProject(id, { user = null } = {}) {
   const params = [id];
+  const scope = readFilter(user, params);
+  const { rows } = await query(
+    `SELECT ${PROJECT_COLUMNS} FROM projects WHERE id = $1${scope ? ` AND ${scope}` : ''}`,
+    params,
+  );
+  return rows[0] || null;
+}
+
+/** Like getProject, but only the owner (or an administrator) may proceed. */
+async function requireProjectOwner(id, { user = null } = {}) {
+  const params = [id];
   const owner = ownerFilter(user, params);
   const { rows } = await query(
     `SELECT ${PROJECT_COLUMNS} FROM projects WHERE id = $1${owner ? ` AND ${owner}` : ''}`,
     params,
   );
-  return rows[0] || null;
+  if (!rows[0]) throw new AppError('Project not found.', { code: Codes.NOT_FOUND, status: 404 });
+  return rows[0];
 }
 
 async function requireProject(id, { user = null } = {}) {
@@ -72,10 +91,12 @@ async function updateProject(id, { name, description, instructions, status, sett
   if (status !== undefined) sets.push(`status = $${params.push(status)}`);
   if (settings !== undefined) sets.push(`settings = $${params.push(JSON.stringify(settings))}::jsonb`);
   if (!sets.length) return requireProject(id, { user });
-  params.push(id);
+  // Remember the id placeholder before ownerFilter appends the actor, otherwise
+  // the WHERE clause would compare the id against the user id.
+  const idIndex = params.push(id);
   const owner = ownerFilter(user, params);
   const { rows } = await query(
-    `UPDATE projects SET ${sets.join(', ')} WHERE id = $${params.length}${owner ? ` AND ${owner}` : ''} RETURNING ${PROJECT_COLUMNS}`,
+    `UPDATE projects SET ${sets.join(', ')} WHERE id = $${idIndex}${owner ? ` AND ${owner}` : ''} RETURNING ${PROJECT_COLUMNS}`,
     params,
   );
   if (!rows[0]) throw new AppError('Project not found.', { code: Codes.NOT_FOUND, status: 404 });
@@ -92,7 +113,8 @@ const restoreProject = (id, opts = {}) => updateProject(id, { status: 'active' }
  * database must never be the only record of where a file lives.
  */
 async function deleteProject(id, { user = null } = {}) {
-  await requireProject(id, { user });
+  // Deleting a shared project stays an owner-only action.
+  await requireProjectOwner(id, { user });
   return withTransaction(async (tx) => {
     const { rows } = await tx.query(`DELETE FROM projects WHERE id = $1 RETURNING id, name, slug`, [id]);
     return rows[0];
@@ -178,6 +200,7 @@ module.exports = {
   listProjects,
   getProject,
   requireProject,
+  requireProjectOwner,
   createProject,
   updateProject,
   archiveProject,

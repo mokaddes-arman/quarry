@@ -15,6 +15,8 @@ const router = express.Router();
 
 const linkLimiter = rateLimit({ windowMs: 15 * 60_000, max: 10, keyPrefix: 'auth-link' });
 const verifyLimiter = rateLimit({ windowMs: 15 * 60_000, max: 30, keyPrefix: 'auth-verify' });
+const passwordLimiter = rateLimit({ windowMs: 15 * 60_000, max: 20, keyPrefix: 'auth-password' });
+const resetLimiter = rateLimit({ windowMs: 15 * 60_000, max: 10, keyPrefix: 'auth-reset' });
 
 /** Per-address throttle so one request cannot be used to spam an inbox. */
 const addressAttempts = new Map();
@@ -142,15 +144,82 @@ router.post(
   }),
 );
 
-/** Consume a login link, open a session and set the cookie. */
+/** Email + password sign-in. */
+router.post(
+  '/auth/login',
+  passwordLimiter,
+  validateBody(
+    z.object({
+      email: z.string().trim().min(3).max(320),
+      password: z.string().min(1).max(128),
+    }),
+  ),
+  asyncHandler(async (req, res) => {
+    const result = await users.loginWithPassword({
+      email: req.validated.email,
+      password: req.validated.password,
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+    });
+    setSessionCookie(res, result.sessionToken, result.sessionExpiresAt);
+    res.json({ user: result.user, expiresAt: result.sessionExpiresAt });
+  }),
+);
+
+/**
+ * Start the "forgot password" flow. Always returns the same answer so it cannot
+ * be used to discover which accounts exist.
+ */
+router.post(
+  '/auth/password/forgot',
+  resetLimiter,
+  validateBody(z.object({ email: z.string().trim().min(3).max(320) })),
+  asyncHandler(async (req, res) => {
+    const email = users.normaliseEmail(req.validated.email);
+    if (!throttleAddress(email)) {
+      throw new AppError('Too many reset attempts for this address. Please wait a few minutes.', {
+        code: 'rate_limited',
+        status: 429,
+      });
+    }
+    await users.requestPasswordReset({ email, origin: requestOrigin(req) });
+    res.json({
+      ok: true,
+      message: 'If that address belongs to an account, a password reset link is on its way.',
+      emailConfigured: mailer.isConfigured(),
+    });
+  }),
+);
+
+/**
+ * Inspect a link before consuming it. Invitations and password resets need one
+ * extra step (choosing a password), which must happen before the token is used.
+ */
+router.post(
+  '/auth/link-info',
+  verifyLimiter,
+  validateBody(z.object({ token: z.string().trim().min(10).max(512) })),
+  asyncHandler(async (req, res) => {
+    res.json(await users.describeLoginToken(req.validated.token));
+  }),
+);
+
+/** Consume a login link, optionally set a password, and open a session. */
 router.post(
   '/auth/verify',
   verifyLimiter,
-  validateBody(z.object({ token: z.string().trim().min(10).max(512) })),
+  validateBody(
+    z.object({
+      token: z.string().trim().min(10).max(512),
+      // Present when the user chose a password on the invitation/reset screen.
+      password: z.string().min(8).max(128).optional(),
+    }),
+  ),
   asyncHandler(async (req, res) => {
     const result = await users.verifyLoginToken(req.validated.token, {
       ip: req.ip,
       userAgent: req.get('user-agent'),
+      password: req.validated.password,
     });
     setSessionCookie(res, result.sessionToken, result.sessionExpiresAt);
     res.json({ user: result.user, expiresAt: result.sessionExpiresAt });

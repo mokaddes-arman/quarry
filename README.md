@@ -90,9 +90,9 @@ npm start          # serves UI + API on http://127.0.0.1:3001
 ```
 
 Then in the UI: **sign in → create a project → upload documents → wait for "indexed" → ask a
-question → read the grounded answer and expand its citations.** Accounts are passwordless: the
-first launch asks you to create the administrator, after which you invite users from the
-**Admin** page (see below for email setup).
+question → read the grounded answer and expand its citations.** Sign in with a password or a
+single-use email link. The first launch asks you to create the administrator, after which you
+invite users from the **Admin** page (see below for email setup).
 
 To get *generated* answers you must add an LLM provider key in **Settings** (stored
 encrypted). With no key configured, retrieval, document management and citation inspection
@@ -143,16 +143,19 @@ Database: PostgreSQL + pgvector  (or embedded PGlite + pgvector)
 - **Knowledge base:** besides files, a project can hold **web links** (pages that are crawled
   into documents), **link lists** (a named set of URLs to import in one go) and
   **collections** (named groups of documents and links). See below.
-- **Accounts:** passwordless sign-in with single-use email links; users only see their own
-  projects, administrators see everything. See below.
+- **Accounts:** password or single-use email-link sign-in; users see the projects they own or
+  are assigned, administrators see everything. See below.
 
 ### Accounts, sign-in and administration
 
-There are no passwords. A user enters their email address and receives a **single-use,
-time-limited sign-in link** (`/login#token=...`). The token travels in the URL fragment, so it
-is never sent to the server or written to access logs, and it is removed from the address bar
-as soon as it is consumed. A successful sign-in sets an HttpOnly, `SameSite=Lax` session
-cookie (`gs_session`); state-changing requests additionally require a same-origin request.
+A user can sign in with their email address and password, or request a **single-use,
+time-limited sign-in link** (`/login#token=...`) by email. Passwords are optional: an invited
+user can set one from their invitation link, and anyone can request a password reset from the
+sign-in screen. Passwords are stored only as salted scrypt hashes. The link token travels in the
+URL fragment, so it is never sent to the server or written to access logs, and it is removed
+from the address bar as soon as it is consumed. A successful sign-in sets an HttpOnly,
+`SameSite=Lax` session cookie (`gs_session`); state-changing requests additionally require a
+same-origin request. Setting or resetting a password revokes the account's other sessions.
 
 **First run.** Either set `ADMIN_EMAIL` (and optionally `ADMIN_NAME`) in `.env` - the first
 administrator is created at boot and a sign-in URL is printed to the server console - or open
@@ -164,26 +167,27 @@ introduced are assigned to the first administrator.
 **Administration.** Administrators get an **Admin** entry in the sidebar with:
 
 - workspace totals (users, invites, projects, documents, chunks, conversations, active jobs);
-- user management: create an account (which emails a sign-in link), resend a link, promote or
-  demote, disable/enable, revoke all sessions, and delete a user (their projects must be
-  reassigned to another administrator).
+- user management: create an account (which emails a sign-in link), resend a link, send a
+  password-reset link, promote or demote, disable/enable, revoke all sessions, assign one or
+  more projects, and delete a user (their projects must be reassigned to another administrator).
 
 **Email.** Set `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` and
-`MAIL_FROM` to send links automatically. SMTP is optional: when it is not configured (or a
-send fails) the invitation still succeeds and the one-time link is returned **once** to the
-administrator in the UI so it can be handed over by another channel. Mail failures never
-break account creation.
+`MAIL_FROM` to send links automatically. SMTP is optional, and administrators always see the
+generated one-time link in the UI (even when email was sent successfully), so it can be handed
+over by another channel or copied if the message lands in spam. Mail failures never break
+account creation.
 
-**Isolation.** `projects.owner_user_id` decides visibility. A normal user can only read or
-change their own projects and everything hanging off them (documents, versions, chunks,
-links, link lists, collections, jobs). Foreign resources return **404**, not 403, so the API
+**Isolation.** A project has an owner and may be assigned to other users. A normal user can
+read or use the projects they own or were assigned, plus everything hanging off those projects
+(documents, versions, chunks, links, link lists, collections, jobs). Renaming, archiving and
+deleting a project remain owner-only. Foreign resources return **404**, not 403, so the API
 never confirms that somebody else's data exists. Conversations also record the user who
 created them: a user only sees their own chats, while an administrator sees every chat in the
 workspace. That means an administrator can review a user's conversations, but chats the
 administrator starts in that user's project stay private to administrators. Cross-project
-search is filtered to the caller's own projects. Global configuration (providers, settings,
-model usage, user management) is administrator-only; the only non-admin exception is the
-personal `ui_theme` preference and the read-only model list used by the chat selector.
+search is filtered to the caller's accessible projects. Global configuration (providers,
+settings, model usage, user management) is administrator-only; the only non-admin exception is
+the personal `ui_theme` preference and the read-only model list used by the chat selector.
 
 ### Supabase / hosted Postgres: lock down the public schema
 
@@ -457,7 +461,7 @@ Current status on this machine (all commands run from the repo root):
 
 | Suite | Command | Result |
 | --- | --- | --- |
-| Backend unit + integration | `npm test` | **165 passed** (17 files) |
+| Backend unit + integration | `npm test` | **180 passed** (18 files) |
 | End-to-end (real browser + real backend) | `npm run test:e2e` | **20 passed** |
 | Retrieval evaluation | `npm run eval:rag` | **8/8 retrieval (100%) + e2e smoke pass** |
 | Backend readiness | `npm run check` | **all checks passed** |
@@ -467,10 +471,11 @@ Current status on this machine (all commands run from the repo root):
 - **Backend tests** — parsers, chunker, encryption, security (path traversal, validation,
   CORS), projects, documents/versioning, providers, retrieval, and the chat contract
   (grounding, abstention, source persistence, SSE streaming, prompt-injection wrapping).
-  Auth and isolation have dedicated coverage: magic-link single use/expiry, sessions,
-  CSRF, disabled accounts, first-run setup, 401/403/404 boundaries, admin user CRUD
-  (invite/resend/disable/delete/reassign), cross-project retrieval scoping and the
-  admin-only surfaces. The knowledge base has its own coverage:
+  Auth and isolation have dedicated coverage: magic-link single use/expiry, password sign-in,
+  invitation/reset password setup, sessions, CSRF, disabled accounts, first-run setup,
+  401/403/404 boundaries, admin user CRUD (invite/resend/disable/delete/reassign), project
+  assignment and access rules, cross-project retrieval scoping and the admin-only surfaces.
+  The knowledge base has its own coverage:
   URL parsing/canonicalisation, private-host refusal, link lists, collections, crawl jobs
   and the `.md` export.
 - **End-to-end tests** — a real Chromium browser drives the actual SPA against a real
@@ -479,8 +484,9 @@ Current status on this machine (all commands run from the repo root):
   abstention on empty projects, per-project isolation and explicit cross-project opt-in);
   the knowledge-base flow (crawl a page → it becomes a document → preview and download
   its `.md`, create a link list and a collection); and the admin flow (invite a user →
-  open the one-time link in a clean browser → the new account gets an isolated,
-  project-less workspace, cannot see admin navigation, and the link cannot be reused).
+  set a password from the one-time link → sign in with it in a clean browser → the new
+  account gets an isolated, project-less workspace, cannot see admin navigation, and the
+  link cannot be reused).
 - **RAG evaluation** — ingests a small labelled corpus and checks the right chunks are
   retrieved, that clearly-absent facts are **not** surfaced, and that a question yields a
   grounded answer with citations.
@@ -499,8 +505,8 @@ All routes are under `/api`. Highlights:
 
 | Area | Endpoints |
 | --- | --- |
-| Auth | `GET /auth/status`, `GET /auth/me`, `POST /auth/setup` (first run only), `POST /auth/request-link`, `POST /auth/verify`, `POST /auth/logout` |
-| Administration | `GET /admin/overview`, `GET/POST /admin/users`, `PATCH /admin/users/:id`, `POST /admin/users/:id/resend`, `DELETE /admin/users/:id/sessions`, `DELETE /admin/users/:id?reassign=<adminId>` (admin only) |
+| Auth | `GET /auth/status`, `GET /auth/me`, `POST /auth/setup` (first run only), `POST /auth/request-link`, `POST /auth/login`, `POST /auth/password/forgot`, `POST /auth/link-info`, `POST /auth/verify`, `POST /auth/logout` |
+| Administration | `GET /admin/overview`, `GET/POST /admin/users`, `PATCH /admin/users/:id`, `POST /admin/users/:id/resend`, `POST /admin/users/:id/password-reset`, `GET/PUT /admin/users/:id/projects`, `DELETE /admin/users/:id/projects/:projectId`, `DELETE /admin/users/:id/sessions`, `DELETE /admin/users/:id?reassign=<adminId>` (admin only) |
 | Health | `GET /health`, `GET /health/ready`, `GET /system/status` |
 | Projects | `GET/POST /projects`, `GET/PATCH/DELETE /projects/:id` |
 | Documents | `POST /projects/:projectId/documents/upload`, `GET /projects/:id/documents`, `GET/DELETE /documents/:id`, `GET /documents/:id/versions`, `POST /documents/:id/activate-version`, `POST /documents/:id/reindex`, `POST /documents/:id/restore`, `GET /documents/:id/file`, `GET /chunks/:id` |
@@ -526,13 +532,13 @@ Streaming answers emit Server-Sent Events: `status`, `retrieval`, `sources`, `to
 - **All interfaces by default** (`HOST=0.0.0.0`) so container hosts such as Render can reach
   the server; set `HOST=127.0.0.1` for local-only. Narrow CORS allow-list; strict security
   headers; no `x-powered-by`.
-- **Passwordless authentication:** single-use emailed sign-in links, SHA-256-hashed tokens,
-  HttpOnly `SameSite=Lax` session cookies, same-origin enforcement for unsafe methods
-  (CSRF), per-address/per-IP throttling on the auth endpoints, and immediate session
-  revocation on logout or by an administrator.
-- **Per-user isolation:** every project has an owner; normal users can only reach their own
-  projects and the rows attached to them. Foreign resources are reported as 404. Global
-  administration surfaces are role-gated on the server, not just hidden in the UI.
+- **Authentication:** password or single-use emailed sign-in links, salted scrypt password
+  hashes, SHA-256-hashed tokens, HttpOnly `SameSite=Lax` session cookies, same-origin
+  enforcement for unsafe methods (CSRF), per-address/per-IP throttling on the auth endpoints,
+  and immediate session revocation on logout, password change or by an administrator.
+- **Per-user isolation:** every project has an owner; normal users can only reach the projects
+  they own or were assigned, and the rows attached to them. Foreign resources are reported as
+  404. Global administration surfaces are role-gated on the server, not just hidden in the UI.
 - **Hosted Postgres lockdown:** the Supabase migration revokes `anon`/`authenticated` access
   and enables deny-by-default RLS on `public` (see above).
 - **Every request body/query/param is validated with Zod**; SQL is fully parameterised.

@@ -114,6 +114,57 @@ describe('structured data parsers', () => {
     expect(parsed.blocks.some((b) => b.kind === 'list' && b.text === 'Safer crawls')).toBe(true);
   });
 
+  it('indexes structured data rendered by inline scripts (mind-map exports)', () => {
+    const labels = Array.from({ length: 80 }, (_, i) => `Requirement ${i + 1}`);
+    const payload = {
+      name: 'Realtor CRM Needs',
+      subtitle: 'Only the CRM Needs sections.',
+      children: [
+        { name: 'Phase 1 - Lead Capture', children: [{ name: 'Core Data', children: labels.slice(0, 40).map((name) => ({ name })) }] },
+        {
+          name: 'Phase 2 - Qualification',
+          description: 'Buyer and seller remain separate client entities linked to one transaction.',
+          children: labels.slice(40).map((name) => ({ name })),
+        },
+      ],
+    };
+    const parsed = html.parseHtml(
+      B(
+        `<html><head><title>Mind Map</title></head><body><div id="tree"></div>` +
+          `<script>const DATA = ${JSON.stringify(payload)}; const treeEl=document.getElementById('tree');</script>` +
+          `</body></html>`,
+      ),
+    );
+
+    const allBlocks = parsed.blocks.map((b) => b.text).join('\n');
+    expect(parsed.blocks.some((b) => b.kind === 'heading' && b.text === 'Phase 1 - Lead Capture')).toBe(true);
+    expect(allBlocks).toContain('Buyer and seller remain separate client entities');
+    for (const label of labels) expect(allBlocks).toContain(label);
+
+    // The same data must survive chunking: no item may fall out between blocks.
+    const { chunkDocument } = require('../../src/ingestion/chunker');
+    const chunks = chunkDocument(parsed, { chunkSizeChars: 400, chunkOverlapChars: 60 });
+    const allChunks = chunks.map((c) => c.content).join('\n');
+    expect(chunks.length).toBeGreaterThan(1);
+    for (const label of labels) expect(allChunks).toContain(label);
+    expect(allChunks).toContain('Buyer and seller remain separate client entities');
+  });
+
+  it('reads application/json script payloads and ignores executable script syntax', () => {
+    const payload = { api: { base: '/v1' }, tags: ['a', 'b'] };
+    const parsed = html.parseHtml(
+      B(
+        `<html><head><title>Config</title></head><body><p>Visible text.</p>` +
+          `<script type="application/json">${JSON.stringify(payload)}</script>` +
+          `<script>alert('this must not be parsed as data')</script></body></html>`,
+      ),
+    );
+    const all = parsed.blocks.map((b) => b.text).join('\n');
+    expect(all).toContain('api.base: /v1');
+    expect(all).toContain('tags: a, b');
+    expect(all).not.toContain('alert');
+  });
+
   it('decodes HTML according to its declared charset', () => {
     const buffer = Buffer.from(
       '<html><head><meta charset="windows-1252"><title>Pricing</title></head><body><p>Price \x80 5</p></body></html>',

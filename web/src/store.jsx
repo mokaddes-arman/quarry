@@ -133,18 +133,32 @@ export function AppProvider({ children }) {
     return () => window.removeEventListener('rag:unauthorized', onUnauthorised);
   }, []);
 
+  const finishLogin = useCallback((data) => {
+    setUser(data.user);
+    setAuthInfo((prev) => ({ ...prev, setupRequired: false }));
+    setView('chat');
+    return data.user;
+  }, []);
+
+  /** Consume a magic link. `password` is set when the user chose one. */
   const login = useCallback(
-    async (token) => {
-      const data = await api.verifyLogin(token);
-      setUser(data.user);
-      setAuthInfo((prev) => ({ ...prev, setupRequired: false }));
-      setView('chat');
-      return data.user;
+    async (token, password) => {
+      const data = await api.verifyLogin(token, password);
+      return finishLogin(data);
     },
-    [],
+    [finishLogin],
+  );
+
+  const loginWithPassword = useCallback(
+    async ({ email, password }) => {
+      const data = await api.loginWithPassword(email, password);
+      return finishLogin(data);
+    },
+    [finishLogin],
   );
 
   const requestLoginLink = useCallback((email) => api.requestLoginLink(email), []);
+  const requestPasswordReset = useCallback((email) => api.requestPasswordReset(email), []);
 
   const setupFirstAdmin = useCallback(async ({ email, name }) => {
     const data = await api.setupAdmin({ email, name });
@@ -488,8 +502,10 @@ export function AppProvider({ children }) {
       authInfo,
       refreshAuth,
       login,
+      loginWithPassword,
       logout,
       requestLoginLink,
+      requestPasswordReset,
       setupFirstAdmin,
       isAdmin: user?.role === 'admin',
       projects,
@@ -524,8 +540,10 @@ export function AppProvider({ children }) {
       authInfo,
       refreshAuth,
       login,
+      loginWithPassword,
       logout,
       requestLoginLink,
+      requestPasswordReset,
       setupFirstAdmin,
       projects,
       projectsLoading,

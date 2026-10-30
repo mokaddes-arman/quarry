@@ -53,9 +53,18 @@ test('admin invites a user who signs in with a one-time link and sees only their
     baseURL: BASE_URL,
     storageState: { cookies: [], origins: [] },
   });
+  const password = 'invitee-password-123';
   try {
     const inviteePage = await invitee.newPage();
     await inviteePage.goto(linkText.trim());
+
+    // An invitation link asks the new user to choose a password before it is
+    // exchanged for a session. They may skip, but setting one enables password
+    // sign-in later.
+    await expect(inviteePage.getByRole('heading', { name: 'Set a password' })).toBeVisible();
+    await inviteePage.getByLabel('New password').fill(password);
+    await inviteePage.getByLabel('Confirm password').fill(password);
+    await inviteePage.getByRole('button', { name: 'Set password & sign in' }).click();
 
     // First-run for this account: no projects yet, no admin navigation.
     await expect(inviteePage.getByText('Welcome to Global Softel RAG Chat')).toBeVisible();
@@ -82,9 +91,16 @@ test('admin invites a user who signs in with a one-time link and sees only their
     const list = (await ownProjects.json()).projects;
     expect(list.map((p) => p.name)).toEqual([projectName]);
 
-    // --- the link is single use --------------------------------------------
+    // --- the link is single use, but the chosen password works --------------
     await inviteePage.locator('aside').getByRole('button', { name: 'Sign out' }).click();
     await expect(inviteePage.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+    await inviteePage.getByLabel('Email address').fill(email);
+    await inviteePage.getByLabel('Password').fill(password);
+    await inviteePage.getByRole('button', { name: 'Sign in' }).click();
+    // The account now has a project, so the landing view is the chat rather
+    // than the welcome screen; the sidebar identifies the signed-in user.
+    await expect(inviteePage.locator('aside').getByText(email)).toBeVisible();
+    await expect(inviteePage.getByRole('heading', { name: 'Sign in' })).toHaveCount(0);
 
     // A fresh browser opening the same URL gets the error instead of a session.
     const late = await browser.newContext({

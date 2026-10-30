@@ -65,8 +65,13 @@ const forced = {
   LOG_LEVEL: process.env.E2E_LOG_LEVEL || 'silent',
   HOST: '127.0.0.1',
   PORT: port,
+  // Explicitly empty: the e2e run must never touch the PostgreSQL instance from
+  // the developer's .env. dotenv only fills missing keys, so this wins.
+  DATABASE_URL: '',
   PGLITE_DIR: path.join(e2eDir, 'pgdata'),
   STORAGE_DIR: path.join(e2eDir, 'store'),
+  // Never send real email from a test run; the admin UI shows the link instead.
+  SMTP_HOST: '',
   HF_HOME: path.join(e2eDir, 'models'),
   // Deterministic vectors: no model download, no network.
   DEFAULT_EMBEDDING_PROVIDER: 'hash',

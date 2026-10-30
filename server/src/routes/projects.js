@@ -13,7 +13,7 @@ const storage = require('../lib/storage');
 const router = express.Router();
 
 // Every /:id route below is scoped to the signed-in user. An administrator sees
-// every project; a normal user sees only the projects they own.
+// every project; a normal user sees the projects they own or were assigned.
 router.param('id', async (req, _res, next, id) => {
   try {
     req.project = await access.assertProject(req.user, id);
@@ -104,6 +104,8 @@ router.delete(
   validateQuery(z.object({ confirm: z.literal('yes') })),
   asyncHandler(async (req, res) => {
     const project = req.project;
+    // Assignment grants read/use access, never the right to destroy the project.
+    await projects.requireProjectOwner(project.id, { user: req.user });
     const { rows } = await require('../db').query('SELECT id FROM documents WHERE project_id = $1', [project.id]);
     const { rows: versions } = await require('../db').query(
       'SELECT storage_path FROM document_versions WHERE project_id = $1',

@@ -158,6 +158,115 @@ describe('session authentication', () => {
   });
 });
 
+describe('password authentication', () => {
+  it('lets an invited user set a password from the link and then sign in with it', async () => {
+    const user = await createUser({ email: 'new-password@test.local', status: 'invited' });
+    const link = await users.issueLoginToken({ userId: user.id, purpose: 'invite' });
+
+    // Inspecting the link must not consume it.
+    const info = await request(app).post('/api/auth/link-info').send({ token: link.token }).expect(200);
+    expect(info.body).toMatchObject({
+      purpose: 'invite',
+      email: 'new-password@test.local',
+      canSetPassword: true,
+    });
+    await request(app).post('/api/auth/link-info').send({ token: link.token }).expect(200);
+
+    const verify = await request(app)
+      .post('/api/auth/verify')
+      .send({ token: link.token, password: 'correct-horse-battery' })
+      .expect(200);
+    expect(verify.body.user).toMatchObject({ email: 'new-password@test.local', hasPassword: true });
+    expect(readCookie(verify)).toBeTruthy();
+
+    // The one-time link is now spent, but the password works.
+    await request(app).post('/api/auth/link-info').send({ token: link.token }).expect(400);
+    const login = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'new-password@test.local', password: 'correct-horse-battery' })
+      .expect(200);
+    const cookie = readCookie(login);
+    expect(cookie).toBeTruthy();
+    await request(app).get('/api/auth/me').set('Cookie', `gs_session=${cookie}`).expect(200);
+  });
+
+  it('rejects a wrong password with the same message as an unknown address', async () => {
+    const user = await createUser({ email: 'with-password@test.local', status: 'invited' });
+    const link = await users.issueLoginToken({ userId: user.id, purpose: 'invite' });
+    await request(app).post('/api/auth/verify').send({ token: link.token, password: 'a-good-password' }).expect(200);
+
+    const wrong = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'with-password@test.local', password: 'not-the-password' })
+      .expect(401);
+    const unknown = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'nobody@test.local', password: 'not-the-password' })
+      .expect(401);
+
+    expect(wrong.body.error.code).toBe('invalid_credentials');
+    expect(unknown.body.error.code).toBe('invalid_credentials');
+    expect(unknown.body.error.message).toBe(wrong.body.error.message);
+
+    // An account that never set a password cannot be entered with one.
+    const noPassword = await createUser({ email: 'no-password@test.local', status: 'active' });
+    expect(noPassword.id).toBeTruthy();
+    await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'no-password@test.local', password: 'whatever-password' })
+      .expect(401);
+  });
+
+  it('returns a generic response for forgot-password requests', async () => {
+    await createUser({ email: 'forgot@test.local', status: 'active' });
+    const known = await request(app)
+      .post('/api/auth/password/forgot')
+      .send({ email: 'forgot@test.local' })
+      .expect(200);
+    const unknown = await request(app)
+      .post('/api/auth/password/forgot')
+      .send({ email: 'nobody@test.local' })
+      .expect(200);
+    expect(unknown.body).toEqual(known.body);
+    expect(JSON.stringify(unknown.body)).not.toContain('token');
+  });
+
+  it('sends a password-reset link that replaces the old password', async () => {
+    const admin = await createUser({ email: 'reset-admin@test.local', role: 'admin', status: 'active' });
+    const adminLink = await users.issueLoginToken({ userId: admin.id });
+    const adminVerify = await request(app).post('/api/auth/verify').send({ token: adminLink.token }).expect(200);
+    const adminCookie = `gs_session=${readCookie(adminVerify)}`;
+
+    const target = await createUser({ email: 'reset-target@test.local', status: 'invited' });
+    const invite = await users.issueLoginToken({ userId: target.id, purpose: 'invite' });
+    await request(app).post('/api/auth/verify').send({ token: invite.token, password: 'old-password-123' }).expect(200);
+
+    const reset = await request(app)
+      .post(`/api/admin/users/${target.id}/password-reset`)
+      .set('Cookie', adminCookie)
+      .expect(202);
+    expect(reset.body.loginUrl).toMatch(/\/login#token=/);
+    const resetToken = reset.body.loginUrl.split('#token=')[1];
+
+    const info = await request(app).post('/api/auth/link-info').send({ token: resetToken }).expect(200);
+    expect(info.body).toMatchObject({ purpose: 'password_reset', canSetPassword: true });
+
+    await request(app)
+      .post('/api/auth/verify')
+      .send({ token: resetToken, password: 'brand-new-password' })
+      .expect(200);
+
+    await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'reset-target@test.local', password: 'brand-new-password' })
+      .expect(200);
+    await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'reset-target@test.local', password: 'old-password-123' })
+      .expect(401);
+  });
+});
+
 describe('administrator user management', () => {
   async function adminCookie() {
     const link = await users.issueLoginToken({ userId: h.TEST_ADMIN_ID });
@@ -283,6 +392,61 @@ describe('administrator user management', () => {
 
     const { rows } = await h.query('SELECT owner_user_id, name FROM projects WHERE name = $1', ['Owned project']);
     expect(rows[0]).toMatchObject({ owner_user_id: h.TEST_ADMIN_ID, name: 'Owned project' });
+  });
+
+  it('assigns a user to one or more projects and honours the access rules', async () => {
+    const cookie = await adminCookie();
+    const user = await createUser({ email: 'assigned@test.local', status: 'active' });
+    const { rows: created } = await h.query(
+      `INSERT INTO projects (name, slug, description, owner_user_id) VALUES
+         ('Shared Alpha', 'shared-alpha', 'x', $1),
+         ('Shared Beta', 'shared-beta', 'x', $1),
+         ('Not Shared', 'not-shared', 'x', $1)
+       RETURNING id, name`,
+      [h.TEST_ADMIN_ID],
+    );
+    const alpha = created.find((p) => p.name === 'Shared Alpha');
+    const beta = created.find((p) => p.name === 'Shared Beta');
+
+    const assigned = await request(app)
+      .put(`/api/admin/users/${user.id}/projects`)
+      .set('Cookie', cookie)
+      .send({ projectIds: [alpha.id, beta.id] })
+      .expect(200);
+    const rows = assigned.body.projects;
+    expect(rows.find((p) => p.id === alpha.id)).toMatchObject({ assigned: true, owned: false });
+    expect(rows.find((p) => p.id === beta.id)).toMatchObject({ assigned: true, owned: false });
+    expect(rows.find((p) => p.name === 'Not Shared')).toMatchObject({ assigned: false, owned: false });
+
+    const userSession = await userCookie(user);
+    const list = await request(app).get('/api/projects').set('Cookie', userSession).expect(200);
+    expect(list.body.projects.map((p) => p.name).sort()).toEqual(['Shared Alpha', 'Shared Beta']);
+    await request(app).get(`/api/projects/${alpha.id}`).set('Cookie', userSession).expect(200);
+
+    // Assignment grants use, not ownership: renaming or deleting is owner-only.
+    await request(app)
+      .patch(`/api/projects/${alpha.id}`)
+      .set('Cookie', userSession)
+      .send({ name: 'Renamed by assignee' })
+      .expect(404);
+    await request(app)
+      .delete(`/api/projects/${alpha.id}?confirm=yes`)
+      .set('Cookie', userSession)
+      .expect(404);
+
+    const revoked = await request(app)
+      .delete(`/api/admin/users/${user.id}/projects/${alpha.id}`)
+      .set('Cookie', cookie)
+      .expect(200);
+    expect(revoked.body.projects.find((p) => p.id === alpha.id)).toMatchObject({ assigned: false });
+    const after = await request(app).get('/api/projects').set('Cookie', userSession).expect(200);
+    expect(after.body.projects.map((p) => p.name)).toEqual(['Shared Beta']);
+
+    // The owner's access cannot be removed through an assignment row.
+    await request(app)
+      .delete(`/api/admin/users/${h.TEST_ADMIN_ID}/projects/${beta.id}`)
+      .set('Cookie', cookie)
+      .expect(409);
   });
 
   it('resends a fresh link and revokes sessions on demand', async () => {

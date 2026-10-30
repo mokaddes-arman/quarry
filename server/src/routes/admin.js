@@ -79,8 +79,9 @@ router.post(
       invite: {
         emailSent: result.email?.sent === true,
         email: result.email,
-        // Present so the admin can copy the link when SMTP is unavailable.
-        loginUrl: result.email?.sent ? undefined : result.url,
+        // Administrators always receive the link: it can be copied and handed
+        // over even when email delivery is configured (or lands in spam).
+        loginUrl: result.url,
         expiresAt: result.expiresAt,
       },
     });
@@ -116,9 +117,66 @@ router.post(
       user: result.user,
       emailSent: result.email?.sent === true,
       email: result.email,
-      loginUrl: result.email?.sent ? undefined : result.url,
+      // Always returned to the administrator so the link can be copied.
+      loginUrl: result.url,
       expiresAt: result.expiresAt,
     });
+  }),
+);
+
+/**
+ * Issue a password-reset link (and email it when SMTP is configured). The link
+ * is always returned so an administrator can hand it over manually.
+ */
+router.post(
+  '/admin/users/:id/password-reset',
+  validateUuidParam('id'),
+  asyncHandler(async (req, res) => {
+    const result = await users.sendPasswordResetLink(req.params.id, {
+      origin: requestOrigin(req),
+      createdBy: req.user.id,
+    });
+    res.status(202).json({
+      user: result.user,
+      emailSent: result.email?.sent === true,
+      email: result.email,
+      loginUrl: result.url,
+      expiresAt: result.expiresAt,
+    });
+  }),
+);
+
+/** Projects this user can open, with owner/assignment flags for the picker. */
+router.get(
+  '/admin/users/:id/projects',
+  validateUuidParam('id'),
+  asyncHandler(async (req, res) => {
+    res.json({ projects: await users.listUserProjects(req.params.id) });
+  }),
+);
+
+/** Grant access to one or many projects at once (idempotent). */
+router.put(
+  '/admin/users/:id/projects',
+  validateUuidParam('id'),
+  validateBody(z.object({ projectIds: z.array(z.string().uuid()).max(500).default([]) })),
+  asyncHandler(async (req, res) => {
+    await users.assignUserProjects(req.params.id, {
+      projectIds: req.validated.projectIds,
+      actorId: req.user.id,
+    });
+    res.json({ projects: await users.listUserProjects(req.params.id) });
+  }),
+);
+
+/** Revoke one assignment. The project owner always keeps access. */
+router.delete(
+  '/admin/users/:id/projects/:projectId',
+  validateUuidParam('id'),
+  validateUuidParam('projectId'),
+  asyncHandler(async (req, res) => {
+    await users.unassignUserProject(req.params.id, req.params.projectId);
+    res.json({ projects: await users.listUserProjects(req.params.id) });
   }),
 );
 

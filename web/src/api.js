@@ -74,7 +74,16 @@ export const api = {
   authStatus: () => request('/auth/status'),
   me: () => request('/auth/me'),
   requestLoginLink: (email) => request('/auth/request-link', { method: 'POST', body: { email } }),
-  verifyLogin: (token) => request('/auth/verify', { method: 'POST', body: { token } }),
+  requestPasswordReset: (email) =>
+    request('/auth/password/forgot', { method: 'POST', body: { email } }),
+  loginWithPassword: (email, password) =>
+    request('/auth/login', { method: 'POST', body: { email, password } }),
+  loginLinkInfo: (token) => request('/auth/link-info', { method: 'POST', body: { token } }),
+  verifyLogin: (token, password) =>
+    request('/auth/verify', {
+      method: 'POST',
+      body: password ? { token, password } : { token },
+    }),
   logout: () => request('/auth/logout', { method: 'POST' }),
   setupAdmin: (body) => request('/auth/setup', { method: 'POST', body }),
 
@@ -84,6 +93,12 @@ export const api = {
   adminCreateUser: (body) => request('/admin/users', { method: 'POST', body }),
   adminUpdateUser: (id, body) => request(`/admin/users/${id}`, { method: 'PATCH', body }),
   adminResendInvite: (id) => request(`/admin/users/${id}/resend`, { method: 'POST' }),
+  adminSendPasswordReset: (id) => request(`/admin/users/${id}/password-reset`, { method: 'POST' }),
+  adminUserProjects: (id) => request(`/admin/users/${id}/projects`),
+  adminAssignProjects: (id, projectIds) =>
+    request(`/admin/users/${id}/projects`, { method: 'PUT', body: { projectIds } }),
+  adminUnassignProject: (id, projectId) =>
+    request(`/admin/users/${id}/projects/${projectId}`, { method: 'DELETE' }),
   adminRevokeSessions: (id) => request(`/admin/users/${id}/sessions`, { method: 'DELETE' }),
   adminDeleteUser: (id, reassignTo) =>
     request(`/admin/users/${id}${qs({ reassign: reassignTo, confirm: 'yes' })}`, { method: 'DELETE' }),

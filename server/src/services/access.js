@@ -3,12 +3,13 @@
 /**
  * Per-user data isolation.
  *
- * A project has exactly one owner. Normal users may only touch their own
- * projects and everything that hangs off them; administrators may touch
- * everything. Conversations additionally belong to the user who created them,
- * so an administrator's chats in a user's project stay invisible to that user.
- * Foreign resources are reported as 404 (not 403) so the API never confirms
- * that somebody else's document, conversation or link exists.
+ * A project has an owner and may additionally be assigned to other users.
+ * Normal users may touch projects they own or that an administrator assigned
+ * to them, plus everything that hangs off those projects; administrators may
+ * touch everything. Conversations additionally belong to the user who created
+ * them, so an administrator's chats in a user's project stay invisible to that
+ * user. Foreign resources are reported as 404 (not 403) so the API never
+ * confirms that somebody else's document, conversation or link exists.
  *
  * Route-level guards are the primary enforcement point. List queries also take
  * the actor so a missed guard cannot silently widen a result set.
@@ -32,18 +33,32 @@ function malformed(message) {
   return new AppError(message, { code: Codes.BAD_REQUEST, status: 400 });
 }
 
+/**
+ * SQL predicate for "the actor may read this project": owner or assigned.
+ * `params` is mutated with the actor id (once, referenced twice). Returns an
+ * empty string for administrators, who can read everything.
+ */
+function projectAccessClause(user, params, alias = 'p') {
+  // Internal service calls (e.g. conversations.createConversation) do not have
+  // an actor; they are only reached after a route-level access check.
+  if (!user || isAdmin(user)) return '';
+  const ref = `$${params.push(user.id)}`;
+  return `(${alias}.owner_user_id = ${ref} OR EXISTS (
+    SELECT 1 FROM user_projects up WHERE up.project_id = ${alias}.id AND up.user_id = ${ref}
+  ))`;
+}
+
 async function assertProject(user, projectId) {
   // Check the shape before touching the database so a malformed id is a clean
   // 400 instead of a Postgres "invalid input syntax for uuid" 500.
   if (!isUuid(projectId)) throw malformed('Invalid project id.');
   if (!user) throw notFound('Project not found.');
   const params = [projectId];
-  let ownerClause = '';
-  if (!isAdmin(user)) {
-    ownerClause = ' AND p.owner_user_id = $2';
-    params.push(user.id);
-  }
-  const { rows } = await query(`SELECT p.* FROM projects p WHERE p.id = $1${ownerClause}`, params);
+  const scope = projectAccessClause(user, params);
+  const { rows } = await query(
+    `SELECT p.* FROM projects p WHERE p.id = $1${scope ? ` AND ${scope}` : ''}`,
+    params,
+  );
   if (!rows[0]) throw notFound('Project not found.');
   return rows[0];
 }
@@ -53,10 +68,11 @@ async function allowedProjectIds(user, { activeOnly = true } = {}) {
   if (!user) return [];
   const conditions = [];
   const params = [];
-  if (!isAdmin(user)) conditions.push(`owner_user_id = $${params.push(user.id)}`);
-  if (activeOnly) conditions.push(`status = 'active'`);
+  const scope = projectAccessClause(user, params);
+  if (scope) conditions.push(scope);
+  if (activeOnly) conditions.push(`p.status = 'active'`);
   const { rows } = await query(
-    `SELECT id FROM projects ${conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''}`,
+    `SELECT p.id FROM projects p ${conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''}`,
     params,
   );
   return rows.map((r) => r.id);
@@ -118,8 +134,12 @@ async function assertOwned(kind, user, id) {
   const params = [id];
   let ownerClause = '';
   if (!isAdmin(user)) {
-    ownerClause = ` AND ${spec.ownerColumn || 'p.owner_user_id'} = $2`;
-    params.push(user.id);
+    if (spec.ownerColumn) {
+      // Conversations stay private to their creator, even inside a shared project.
+      ownerClause = ` AND ${spec.ownerColumn} = $${params.push(user.id)}`;
+    } else {
+      ownerClause = ` AND ${projectAccessClause(user, params)}`;
+    }
   }
   const { rows } = await query(`${spec.sql}${ownerClause}`, params);
   if (!rows[0]) throw notFound(spec.label);
@@ -144,6 +164,7 @@ function requireOwnedAccess(kind, param = 'id', as = 'resource') {
 
 module.exports = {
   isAdmin,
+  projectAccessClause,
   assertProject,
   assertOwned,
   allowedProjectIds,
