@@ -62,7 +62,7 @@ router.get(
          (SELECT COUNT(*)::int FROM projects WHERE id = ANY($1::uuid[]) AND status = 'active') AS projects,
          (SELECT COUNT(*)::int FROM documents WHERE NOT archived AND project_id = ANY($1::uuid[])) AS documents,
          (SELECT COUNT(*)::int FROM document_chunks WHERE project_id = ANY($1::uuid[])) AS chunks,
-         (SELECT COUNT(*)::int FROM conversations WHERE NOT archived AND project_id = ANY($1::uuid[])${conversationOwner}) AS conversations,
+         (SELECT COUNT(*)::int FROM conversations WHERE NOT archived AND channel = 'internal' AND project_id = ANY($1::uuid[])${conversationOwner}) AS conversations,
          (SELECT COUNT(*)::int FROM ingestion_jobs WHERE status IN ('queued','processing') AND project_id = ANY($1::uuid[])) AS active_jobs`,
       conversationParams,
     );

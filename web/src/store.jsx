@@ -10,6 +10,7 @@ import {
 import { api, askStream } from './api';
 import { useToast } from './components/ui';
 import { normaliseSource } from './lib/sources';
+import { buildUrl, readRoute } from './lib/routes';
 
 /**
  * A single small store for cross-cutting UI state: which project is active,
@@ -35,29 +36,18 @@ function applyTheme(theme) {
   document.documentElement.classList.toggle('dark', dark);
 }
 
-/**
- * Drop the `/login` path (and its one-time token) once a session is active.
- * Without this the address bar keeps showing `/login` while the user works in
- * Chat, Documents and the other views, because view changes do not navigate.
- */
-function clearLoginPath() {
-  const match = window.location.pathname.match(/^(.*?)\/login\/?$/i);
-  if (!match) return;
-  const base = match[1] || '/';
-  window.history.replaceState(null, '', `${base}${window.location.search}`);
-}
-
 export function AppProvider({ children }) {
   const [projects, setProjects] = useState([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [projectsError, setProjectsError] = useState(null);
 
+  const initialRoute = typeof window !== 'undefined' ? readRoute() : { view: 'chat', projectId: null };
   const [activeProjectId, setActiveProjectIdState] = useState(
-    () => localStorage.getItem(PROJECT_KEY) || null,
+    () => initialRoute.projectId || localStorage.getItem(PROJECT_KEY) || null,
   );
 
   const [theme, setThemeState] = useState(() => localStorage.getItem(THEME_KEY) || 'system');
-  const [view, setView] = useState('chat');
+  const [view, setViewState] = useState(initialRoute.view || 'chat');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [systemStatus, setSystemStatus] = useState(null);
@@ -81,6 +71,53 @@ export function AppProvider({ children }) {
   const askStreamingRef = useRef(null); // conversation id currently streaming
   const askSeqRef = useRef(0);
   const toast = useToast();
+
+  // --- routing ---------------------------------------------------------------
+  // Views are real URLs so they can be bookmarked or opened in a second window.
+  // The router is deliberately tiny: pushState on navigation, popstate to go
+  // back, and the selected project in `?project=`.
+  const activeProjectIdRef = useRef(activeProjectId);
+  useEffect(() => {
+    activeProjectIdRef.current = activeProjectId;
+  }, [activeProjectId]);
+
+  const putLocation = useCallback((nextView, { projectId, replace = false, params } = {}) => {
+    if (typeof window === 'undefined') return;
+    const destination = buildUrl(nextView, {
+      projectId: projectId === undefined ? activeProjectIdRef.current : projectId,
+      params,
+    });
+    const current = `${window.location.pathname}${window.location.search}`;
+    if (destination === current) return;
+    window.history[replace ? 'replaceState' : 'pushState'](null, '', destination);
+  }, []);
+
+  const setView = useCallback(
+    (nextView) => {
+      setViewState(nextView);
+      putLocation(nextView);
+      setSidebarOpen(false);
+    },
+    [putLocation],
+  );
+
+  useEffect(() => {
+    const onPopState = () => {
+      const route = readRoute();
+      // The public widget is rendered outside the authenticated shell and does
+      // not own any store state.
+      if (route.view === 'public-embed') return;
+      const nextView = route.view || 'chat';
+      setViewState(nextView);
+      const nextProject = route.projectId || localStorage.getItem(PROJECT_KEY) || null;
+      setActiveProjectIdState(nextProject);
+      if (nextProject) localStorage.setItem(PROJECT_KEY, nextProject);
+      else localStorage.removeItem(PROJECT_KEY);
+      setActiveConversationId(null);
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   // --- authentication ---------------------------------------------------------
   // `user` is null while signed out. Everything that fetches project data waits
@@ -113,9 +150,22 @@ export function AppProvider({ children }) {
     refreshAuth();
   }, [refreshAuth]);
 
+  // Canonicalise `/` and `/login` to a real view once a session is active.
+  // A bookmarked page such as `/documents` is left exactly as it is.
   useEffect(() => {
-    if (user) clearLoginPath();
-  }, [user]);
+    if (!user) return;
+    const route = readRoute();
+    if (route.view === 'public-embed') return;
+    const pathname = window.location.pathname.replace(/\/+$/, '') || '/';
+    const isLogin = /\/login$/i.test(pathname);
+    if (!isLogin && route.view && pathname !== '/') return;
+    const nextView = route.view || 'chat';
+    setViewState(nextView);
+    putLocation(nextView, {
+      projectId: route.projectId || activeProjectIdRef.current,
+      replace: true,
+    });
+  }, [user, putLocation]);
 
   // Any API call that comes back 401 means the session expired or was revoked.
   useEffect(() => {
@@ -133,12 +183,16 @@ export function AppProvider({ children }) {
     return () => window.removeEventListener('rag:unauthorized', onUnauthorised);
   }, []);
 
-  const finishLogin = useCallback((data) => {
-    setUser(data.user);
-    setAuthInfo((prev) => ({ ...prev, setupRequired: false }));
-    setView('chat');
-    return data.user;
-  }, []);
+  const finishLogin = useCallback(
+    (data) => {
+      setUser(data.user);
+      setAuthInfo((prev) => ({ ...prev, setupRequired: false }));
+      setViewState('chat');
+      putLocation('chat', { projectId: null });
+      return data.user;
+    },
+    [putLocation],
+  );
 
   /** Consume a magic link. `password` is set when the user chose one. */
   const login = useCallback(
@@ -173,7 +227,7 @@ export function AppProvider({ children }) {
       /* the local state is cleared regardless */
     }
     setUser(null);
-    setView('chat');
+    setViewState('chat');
     setProjects([]);
     setProjectsLoading(false);
     setSystemStatus(null);
@@ -183,6 +237,9 @@ export function AppProvider({ children }) {
     setMessageSources([]);
     setAsk(null);
     localStorage.removeItem(PROJECT_KEY);
+    if (window.location.pathname !== '/login') {
+      window.history.replaceState(null, '', '/login');
+    }
   }, []);
 
   // --- theme -----------------------------------------------------------------
@@ -251,23 +308,30 @@ export function AppProvider({ children }) {
       const first = projects[0].id;
       setActiveProjectIdState(first);
       localStorage.setItem(PROJECT_KEY, first);
+      // A stale `?project=` from a bookmark must not survive the fallback.
+      if (readRoute().projectId) putLocation(view, { projectId: first, replace: true });
     }
-  }, [projects, activeProjectId, projectsLoading]);
+  }, [projects, activeProjectId, projectsLoading, putLocation, view]);
 
   const activeProject = useMemo(
     () => projects.find((p) => p.id === activeProjectId) || null,
     [projects, activeProjectId],
   );
 
-  const selectProject = useCallback((id, nextView = 'chat') => {
-    setActiveProjectIdState(id || null);
-    if (id) localStorage.setItem(PROJECT_KEY, id);
-    else localStorage.removeItem(PROJECT_KEY);
-    setActiveConversationId(null);
-    setConversations([]);
-    setView(nextView);
-    setSidebarOpen(false);
-  }, []);
+  const selectProject = useCallback(
+    (id, nextView = 'chat') => {
+      const nextId = id || null;
+      setActiveProjectIdState(nextId);
+      if (nextId) localStorage.setItem(PROJECT_KEY, nextId);
+      else localStorage.removeItem(PROJECT_KEY);
+      setActiveConversationId(null);
+      setConversations([]);
+      setViewState(nextView);
+      putLocation(nextView, { projectId: nextId });
+      setSidebarOpen(false);
+    },
+    [putLocation],
+  );
 
   const createProject = useCallback(
     async (body) => {
@@ -317,7 +381,9 @@ export function AppProvider({ children }) {
     }
     setConversationsLoading(true);
     try {
-      const data = await api.projectConversations(activeProjectId, { limit: 200 });
+      // The sidebar is a personal history: administrators review other users'
+      // and widget conversations from the dedicated admin viewer instead.
+      const data = await api.projectConversations(activeProjectId, { limit: 200, mine: true });
       const list = data.conversations || [];
       setConversations(list);
       return list;

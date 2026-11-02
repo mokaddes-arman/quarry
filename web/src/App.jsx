@@ -10,7 +10,11 @@ import { DashboardView } from './views/DashboardView';
 import { SettingsView } from './views/SettingsView';
 import { ModelUsageView } from './views/ModelUsageView';
 import { AdminView } from './views/AdminView';
+import { AdminConversationsView } from './views/AdminConversationsView';
+import { EmbedView } from './views/EmbedView';
+import { PublicEmbedView } from './views/PublicEmbedView';
 import { LoginView } from './views/LoginView';
+import { readRoute } from './lib/routes';
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -113,15 +117,21 @@ function Main() {
   const { view, isAdmin, projects, projectsLoading, sidebarOpen, setSidebarOpen, activeProject } = useApp();
 
   // Views that make sense with no project at all.
-  const globalView = view === 'settings' || view === 'model-usage' || view === 'admin';
+  const globalView =
+    view === 'settings' ||
+    view === 'model-usage' ||
+    view === 'admin' ||
+    view === 'admin-conversations';
   const showFirstProject = !projectsLoading && projects.length === 0 && !globalView;
 
   let content;
   if (view === 'admin' && isAdmin) content = <AdminView />;
+  else if (view === 'admin-conversations' && isAdmin) content = <AdminConversationsView />;
   else if (showFirstProject) content = <FirstProjectScreen />;
   else if (view === 'documents') content = <DocumentsView />;
   else if (view === 'search') content = <SearchView />;
   else if (view === 'dashboard') content = <DashboardView />;
+  else if (view === 'embed') content = <EmbedView />;
   else if (view === 'model-usage' && isAdmin) content = <ModelUsageView />;
   else if (view === 'settings' && isAdmin) content = <SettingsView />;
   else content = <ChatView />;
@@ -156,6 +166,14 @@ function Main() {
 
 export function App() {
   const { authLoading, user } = useApp();
+  const route = readRoute();
+
+  // The public widget is deliberately independent of the signed-in shell: an
+  // external visitor may have no account and the page is framed by another
+  // website.
+  if (route.view === 'public-embed') {
+    return <PublicEmbedView embedKey={route.embedKey} />;
+  }
 
   if (authLoading) {
     return (

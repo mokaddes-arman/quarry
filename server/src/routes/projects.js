@@ -157,12 +157,16 @@ router.get(
       limit: z.coerce.number().int().min(1).max(200).optional(),
       offset: z.coerce.number().int().min(0).optional(),
       includeArchived: booleanQuery(),
+      // Administrators see every internal conversation by default (used by
+      // tests and the admin viewer); the chat sidebar asks for its own only.
+      mine: booleanQuery(),
     }),
   ),
   asyncHandler(async (req, res) => {
     res.json({
       conversations: await conversations.listConversations(req.project.id, {
         ...(req.validatedQuery || {}),
+        ownerOnly: Boolean(req.validatedQuery?.mine),
         user: req.user,
       }),
     });

@@ -23,13 +23,15 @@ const MAX_SOURCES_PERSISTED = 25;
 // ---------------------------------------------------------------------------
 // CRUD
 // ---------------------------------------------------------------------------
-async function listConversations(projectId, { user, search, limit = 50, offset = 0, includeArchived = false } = {}) {
+async function listConversations(projectId, { user, search, limit = 50, offset = 0, includeArchived = false, ownerOnly = false } = {}) {
   // Route guards already require a signed-in user; returning nothing here keeps
   // a future direct caller from accidentally widening the result set.
   if (!user) return [];
-  const conditions = ['project_id = $1'];
+  // External (widget) conversations are reviewed in the admin conversation
+  // viewer and must never leak into the normal project chat history.
+  const conditions = ["project_id = $1", "channel = 'internal'"];
   const params = [projectId];
-  if (user.role !== 'admin') conditions.push(`owner_user_id = $${params.push(user.id)}`);
+  if (user.role !== 'admin' || ownerOnly) conditions.push(`owner_user_id = $${params.push(user.id)}`);
   if (!includeArchived) conditions.push('archived = false');
   if (search) conditions.push(`title ILIKE $${params.push(`%${search}%`)}`);
   params.push(Math.min(limit, 200), Math.max(offset, 0));
@@ -77,8 +79,8 @@ async function getConversation(id, { includeSources = true } = {}) {
 async function createConversation(projectId, { ownerUserId = null, title = 'New conversation', llmConfigId = null, provider = null, model = null, retrievalSettings = {} } = {}) {
   await requireProject(projectId);
   const { rows } = await query(
-    `INSERT INTO conversations (project_id, owner_user_id, title, llm_config_id, provider, model, retrieval_settings)
-     VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb) RETURNING *`,
+    `INSERT INTO conversations (project_id, owner_user_id, title, llm_config_id, provider, model, retrieval_settings, channel)
+     VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,'internal') RETURNING *`,
     [projectId, ownerUserId, truncate(title, 120), llmConfigId, provider, model, JSON.stringify(retrievalSettings)],
   );
   return rows[0];

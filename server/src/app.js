@@ -21,6 +21,8 @@ const conversationRoutes = require('./routes/conversations');
 const providerRoutes = require('./routes/providers');
 const settingsRoutes = require('./routes/settings');
 const usageRoutes = require('./routes/usage');
+const embedRoutes = require('./routes/embed');
+const publicRoutes = require('./routes/public');
 
 function createApp({ testAuth = false, testAuthUserId = null } = {}) {
   const app = express();
@@ -46,13 +48,25 @@ function createApp({ testAuth = false, testAuthUserId = null } = {}) {
     }),
   );
 
-  // Baseline hardening for every response.
-  app.use((_req, res, next) => {
+  // Baseline hardening for every response. The public widget must be frameable
+  // by the customer's website, so those paths get an explicit allowance instead
+  // of X-Frame-Options: DENY.
+  app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('Referrer-Policy', 'no-referrer');
-    res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
     res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+    const embedSurface =
+      req.path === '/embed.js' ||
+      req.path.startsWith('/embed/') ||
+      req.path === '/embed' ||
+      req.path.startsWith('/api/public/');
+    if (embedSurface) {
+      res.setHeader('Content-Security-Policy', "frame-ancestors *");
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    } else {
+      res.setHeader('X-Frame-Options', 'DENY');
+      res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
+    }
     next();
   });
 
@@ -73,6 +87,12 @@ function createApp({ testAuth = false, testAuthUserId = null } = {}) {
   //
   // Public surface: health probes and the auth endpoints (setup / request a
   // link / verify / logout). Everything below `requireAuth` needs a session.
+  //
+  // The widget API is mounted *before* authenticate/csrfGuard: visitors are on
+  // another website, have no session and send legitimate cross-origin requests.
+  // It authenticates with a visitor token scoped to one embed key instead.
+  app.use(publicRoutes);
+
   app.use('/api', authenticate);
   app.use('/api', csrfGuard);
   app.use('/api', healthRoutes);
@@ -82,6 +102,7 @@ function createApp({ testAuth = false, testAuthUserId = null } = {}) {
   app.use('/api', providerRoutes);
   app.use('/api', settingsRoutes);
   app.use('/api', usageRoutes);
+  app.use('/api', embedRoutes);
   app.use('/api/projects', projectRoutes);
   app.use('/api', documentRoutes);
   app.use('/api', knowledgeRoutes);

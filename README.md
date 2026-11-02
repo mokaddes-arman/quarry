@@ -145,6 +145,9 @@ Database: PostgreSQL + pgvector  (or embedded PGlite + pgvector)
   **collections** (named groups of documents and links). See below.
 - **Accounts:** password or single-use email-link sign-in; users see the projects they own or
   are assigned, administrators see everything. See below.
+- **Public chat widget:** expose any project as an embeddable chat widget on another website
+  with configurable branding, consent, allowed origins, and a copyable JavaScript snippet. External
+  visitor conversations are isolated from internal chat history and reviewable by administrators.
 
 ### Accounts, sign-in and administration
 
@@ -189,6 +192,73 @@ search is filtered to the caller's accessible projects. Global configuration (pr
 settings, model usage, user management) is administrator-only; the only non-admin exception is
 the personal `ui_theme` preference and the read-only model list used by the chat selector.
 
+### Pages and URLs
+
+Every page is a real URL that can be bookmarked, refreshed, or opened in a second window. The
+active project travels in `?project=<id>`; the old `#`-based navigation is no longer used.
+
+| Page | URL |
+| --- | --- |
+| Chat | `/chats` |
+| Documents | `/documents` |
+| Search | `/search` |
+| Dashboard | `/dashboard` |
+| Chat widget settings | `/embed` |
+| Administrator conversation review | `/admin/conversations` |
+| User administration | `/admin` |
+| Model usage | `/model-usage` |
+| Settings | `/settings` |
+
+`/` and `/login` canonicalise to a real view once a session exists. The public widget is served
+at `/embed/<publicKey>` and works without an account.
+
+### Administrator conversation review
+
+Administrators get a dedicated **Conversation review** window at `/admin/conversations`. It is
+separate from normal chat and has four scopes:
+
+- **My chats** - internal conversations the administrator owns;
+- **Other users** - internal conversations owned by anybody else;
+- **Widget visitors** - conversations started from a public widget;
+- **All** - every internal and widget conversation.
+
+Rows can be filtered by project, by workspace user, and by free-text search over titles, user
+names/emails, and visitor names/emails. Opening a row shows the full transcript and citations
+plus the visitor's name, email, and consent time. Administrators can **delete** a conversation,
+but cannot reply, impersonate a user, or post as a visitor from this surface. Widget
+conversations stay out of normal project history, dashboard statistics, and workspace counts,
+even for administrators.
+
+### Public chat widget
+
+A project owner (or an administrator) can expose a project as an embeddable chat widget from
+**Chat widget** (`/embed`). The page provides:
+
+- **Branding** - brand name, slogan, theme colour, welcome message, and a logo uploaded as a
+  PNG/JPEG/WEBP/GIF (2 MB limit) or supplied as an external URL. Uploaded logos are stored under
+  the `external_logo/` folder in the configured storage backend;
+- **Consent** - enable or disable the consent gate and edit its title, body, and privacy-policy
+  link;
+- **Allowed origins** - the websites permitted to use the key. An empty list allows any site;
+  the app's own origin is always allowed;
+- **Embed code** - a copyable `widgetUrl` and a floating launcher snippet:
+
+  ```html
+  <script src="https://your-host/embed.js?key=PUBLIC_KEY" async></script>
+  ```
+
+- **Key rotation** - invalidates the previous key and the old snippet immediately.
+
+The launcher injects a floating button and an iframe pointing at `/embed/<publicKey>`. Visitors
+do not sign in. Before the first message they enter their **name**, **email**, and (when
+required) accept the consent notice. The server returns a random visitor token; the browser
+keeps it in `localStorage` for that widget only, and the database stores only its SHA-256 hash.
+Conversations are written to the normal `conversations`/`messages` tables with
+`channel = 'external'`, a visitor snapshot, and no workspace owner. The widget API runs before
+session authentication and CSRF, is scoped to one embed key and visitor token, and its
+conversations are visible only through the administrator review window. Deleting the project,
+the widget, or the conversation cascades the associated visitor data.
+
 ### Supabase / hosted Postgres: lock down the public schema
 
 Supabase exposes the `public` schema over PostgREST to the `anon` and `authenticated` roles by
@@ -227,6 +297,7 @@ Set all three Supabase Storage variables to keep uploaded documents in a private
 SUPABASE_URL=https://<project-ref>.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=<server-only service-role key>
 SUPABASE_STORAGE_BUCKET=rag-documents
+SUPABASE_LOGO_FOLDER=external_logo
 ```
 
 Create the bucket as **private**. The app talks to the Supabase Storage REST API with the
@@ -234,11 +305,21 @@ service-role key from the server only; it never sends the key to the browser and
 public bucket URL. Downloads still go through `GET /api/documents/:id/file`, so the existing
 project/user authorization checks apply before any bytes are read.
 
-Object keys include the owner, project and document ids:
+Document object keys include the owner, project and document ids:
 
 ```text
 <owner-user-id>/<project-id>/<document-id>/v<version>__<filename>
 ```
+
+Widget logos use a separate folder in the same bucket and the same Supabase URL/service-role
+key. Set `SUPABASE_LOGO_FOLDER` to choose that folder; it defaults to `external_logo`:
+
+```text
+external_logo/<project-id>/<embed-id>/v1__<filename>
+```
+
+On local disk this becomes `storage/uploads/external_logo/...`. Old logo keys remain readable, so
+re-uploading or deleting a reviewed logo cleans up only the object it replaces.
 
 Permanent document deletion and project deletion remove the corresponding objects. If any of
 the three variables is missing, the app uses `STORAGE_DIR` (local disk) as before, which is the
@@ -359,6 +440,7 @@ The most important ones:
 | `SUPABASE_URL` | Supabase project URL; set with the two variables below to enable remote storage. | *(empty)* |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only service-role key for the private storage bucket. Never expose to the browser. | *(empty)* |
 | `SUPABASE_STORAGE_BUCKET` | Private bucket name for original uploads. | *(empty)* |
+| `SUPABASE_LOGO_FOLDER` | Folder prefix for widget logos within the same bucket. | `external_logo` |
 | `MAX_UPLOAD_SIZE_MB` | Per-file upload cap. | `20` |
 | `ADMIN_EMAIL` | First administrator, created on boot when the user table is empty. | *(empty)* |
 | `APP_PUBLIC_URL` | Public origin used in emailed sign-in links. | *(request host)* |
@@ -461,8 +543,8 @@ Current status on this machine (all commands run from the repo root):
 
 | Suite | Command | Result |
 | --- | --- | --- |
-| Backend unit + integration | `npm test` | **180 passed** (18 files) |
-| End-to-end (real browser + real backend) | `npm run test:e2e` | **20 passed** |
+| Backend unit + integration | `npm test` | **199 passed** (19 files) |
+| End-to-end (real browser + real backend) | `npm run test:e2e` | **23 passed** |
 | Retrieval evaluation | `npm run eval:rag` | **8/8 retrieval (100%) + e2e smoke pass** |
 | Backend readiness | `npm run check` | **all checks passed** |
 
@@ -477,16 +559,22 @@ Current status on this machine (all commands run from the repo root):
   assignment and access rules, cross-project retrieval scoping and the admin-only surfaces.
   The knowledge base has its own coverage:
   URL parsing/canonicalisation, private-host refusal, link lists, collections, crawl jobs
-  and the `.md` export.
+  and the `.md` export. Widget coverage adds owner/admin configuration, logo upload and
+  deletion, key rotation, allowed origins, visitor consent and token hashing, external
+  conversation isolation, administrator scopes/filters/detail/delete, and checks that widget
+  chats never appear in project history, dashboard statistics or workspace counts.
 - **End-to-end tests** — a real Chromium browser drives the actual SPA against a real
   backend: onboarding → project → document upload → indexing → ask → read the grounded
   answer and expand its citations; the HTTP-level RAG contract (retrieval, grounding,
   abstention on empty projects, per-project isolation and explicit cross-project opt-in);
   the knowledge-base flow (crawl a page → it becomes a document → preview and download
-  its `.md`, create a link list and a collection); and the admin flow (invite a user →
+  its `.md`, create a link list and a collection); the admin flow (invite a user →
   set a password from the one-time link → sign in with it in a clean browser → the new
   account gets an isolated, project-less workspace, cannot see admin navigation, and the
-  link cannot be reused).
+  link cannot be reused); stable per-page URLs and reloads; the administrator conversation
+  review window with own/other-user/widget scopes, filters, detail and delete; and the
+  public widget flow in a clean browser (branding → consent + name/email → grounded answer
+  with sources → transcript restored after reload → visible in the admin viewer).
 - **RAG evaluation** — ingests a small labelled corpus and checks the right chunks are
   retrieved, that clearly-absent facts are **not** surfaced, and that a question yields a
   grounded answer with citations.
@@ -501,12 +589,16 @@ citations** — not model answer quality. Validate answer quality with your own 
 
 ## API surface
 
-All routes are under `/api`. Highlights:
+All routes are under `/api` (the launcher script is the one root-level exception). Highlights:
 
 | Area | Endpoints |
 | --- | --- |
 | Auth | `GET /auth/status`, `GET /auth/me`, `POST /auth/setup` (first run only), `POST /auth/request-link`, `POST /auth/login`, `POST /auth/password/forgot`, `POST /auth/link-info`, `POST /auth/verify`, `POST /auth/logout` |
 | Administration | `GET /admin/overview`, `GET/POST /admin/users`, `PATCH /admin/users/:id`, `POST /admin/users/:id/resend`, `POST /admin/users/:id/password-reset`, `GET/PUT /admin/users/:id/projects`, `DELETE /admin/users/:id/projects/:projectId`, `DELETE /admin/users/:id/sessions`, `DELETE /admin/users/:id?reassign=<adminId>` (admin only) |
+| Conversation review | `GET /admin/conversations?scope=mine\|users\|external\|all&projectId=&userId=&search=&limit=&offset=`, `GET/DELETE /admin/conversations/:id` (admin only; read/delete, no replies) |
+| Widget settings | `GET/PATCH /projects/:id/embed`, `POST /projects/:id/embed/rotate-key`, `POST/DELETE /projects/:id/embed/logo` (project owner or admin) |
+| Public widget | `GET /public/embeds/:key`, `GET /public/embeds/:key/logo`, `POST /public/embeds/:key/visitors`, `GET /public/embeds/:key/session`, `POST /public/embeds/:key/conversations`, `GET/POST /public/embeds/:key/conversations/:id/messages` (visitor token, no session) |
+| Launcher | `GET /embed.js?key=<publicKey>` (root, outside `/api`) |
 | Health | `GET /health`, `GET /health/ready`, `GET /system/status` |
 | Projects | `GET/POST /projects`, `GET/PATCH/DELETE /projects/:id` |
 | Documents | `POST /projects/:projectId/documents/upload`, `GET /projects/:id/documents`, `GET/DELETE /documents/:id`, `GET /documents/:id/versions`, `POST /documents/:id/activate-version`, `POST /documents/:id/reindex`, `POST /documents/:id/restore`, `GET /documents/:id/file`, `GET /chunks/:id` |
@@ -539,6 +631,13 @@ Streaming answers emit Server-Sent Events: `status`, `retrieval`, `sources`, `to
 - **Per-user isolation:** every project has an owner; normal users can only reach the projects
   they own or were assigned, and the rows attached to them. Foreign resources are reported as
   404. Global administration surfaces are role-gated on the server, not just hidden in the UI.
+- **Public widget isolation:** the widget API has no cookie/session auth. It is limited to one
+  embed key, enforces the configured allowed origins, stores only hashed visitor tokens, and
+  accepts a visitor token via `Authorization: Bearer ...` or `x-embed-token`. External
+  conversations never appear in internal lists, project statistics, or workspace counts, and
+  only administrators can read or delete them. The widget surfaces replace
+  `X-Frame-Options: DENY` with `Content-Security-Policy: frame-ancestors *` so customers can
+  iframe them; every other response keeps the deny-by-default framing policy.
 - **Hosted Postgres lockdown:** the Supabase migration revokes `anon`/`authenticated` access
   and enables deny-by-default RLS on `public` (see above).
 - **Every request body/query/param is validated with Zod**; SQL is fully parameterised.

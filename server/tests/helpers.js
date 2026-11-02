@@ -66,7 +66,7 @@ async function resetData() {
                         document_versions, documents, embedding_models, embedding_configs,
                         llm_provider_configs, projects, application_settings,
                         crawl_jobs, collection_items, web_links, link_list_items, link_lists,
-                        collections, auth_sessions, auth_login_tokens CASCADE`);
+                        collections, auth_sessions, auth_login_tokens, embed_visitors, project_embeds CASCADE`);
 }
 
 async function createProject(name = 'Test Project', description = null) {

@@ -73,6 +73,7 @@ const isTest = nodeEnv === 'test' || Boolean(process.env.VITEST);
 const supabaseUrl = String(str('SUPABASE_URL', '') || '').replace(/\/+$/, '');
 const supabaseServiceRoleKey = str('SUPABASE_SERVICE_ROLE_KEY', '');
 const supabaseStorageBucket = str('SUPABASE_STORAGE_BUCKET', '');
+const supabaseLogoFolder = str('SUPABASE_LOGO_FOLDER', 'external_logo');
 
 const config = {
   projectRoot: PROJECT_ROOT,
@@ -104,6 +105,7 @@ const config = {
     url: supabaseUrl,
     serviceRoleKey: supabaseServiceRoleKey,
     bucket: supabaseStorageBucket,
+    logoFolder: supabaseLogoFolder,
     enabled: Boolean(supabaseUrl && supabaseServiceRoleKey && supabaseStorageBucket),
   },
 

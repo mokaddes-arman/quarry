@@ -3,7 +3,7 @@ const os = require('node:os');
 const path = require('node:path');
 const fsp = require('node:fs/promises');
 const { createSupabaseStorage } = require('../../src/services/storage/supabase');
-const { buildRelativePath } = require('../../src/services/storage/paths');
+const { buildRelativePath, buildEmbedLogoPath, EMBED_LOGO_PREFIX } = require('../../src/services/storage/paths');
 
 const SETTINGS = {
   url: 'https://example.supabase.co',
@@ -33,6 +33,26 @@ describe('storage: object keys', () => {
       originalFilename: '../../Report.pdf',
     });
     expect(key).toBe('user-1/project-1/document-1/v2__Report.pdf');
+  });
+
+  it('keeps widget logos in the external_logo folder', () => {
+    const key = buildEmbedLogoPath({
+      projectId: 'project-1',
+      embedId: 'embed-1',
+      originalFilename: '../../Brand Logo.png',
+    });
+    expect(EMBED_LOGO_PREFIX).toBe('external_logo');
+    expect(key).toBe('external_logo/project-1/embed-1/v1__Brand Logo.png');
+  });
+
+  it('uses a configured widget logo folder', () => {
+    const key = buildEmbedLogoPath({
+      projectId: 'project-1',
+      embedId: 'embed-1',
+      originalFilename: 'Brand.png',
+      folder: 'production-logos',
+    });
+    expect(key).toBe('production-logos/project-1/embed-1/v1__Brand.png');
   });
 });
 

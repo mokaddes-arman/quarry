@@ -106,7 +106,7 @@ test('upload a document, ask a question and read the cited answer', async ({ pag
   });
 
   // --- 3. ask a grounded question ------------------------------------------
-  await page.getByRole('button', { name: 'Chat' }).click();
+  await page.getByRole('button', { name: 'Chat', exact: true }).click();
   const composer = page.getByPlaceholder(/Ask a question/);
   await expect(composer).toBeEnabled();
   await composer.fill(SAMPLE_QUESTION);
@@ -170,7 +170,7 @@ test('a generation keeps running while the user opens another page', async ({ pa
   await expect(page.getByRole('heading', { name: 'Documents' })).toBeVisible();
 
   // --- return while it is still generating: the live exchange is restored ---
-  await page.getByRole('button', { name: 'Chat' }).click();
+  await page.getByRole('button', { name: 'Chat', exact: true }).click();
   await expect(page.getByText(SAMPLE_QUESTION).first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Stop' })).toBeVisible();
 

@@ -6,6 +6,7 @@ const { asyncHandler } = require('../middleware/errorHandler');
 const { validateBody, validateQuery, validateUuidParam, booleanQuery } = require('../middleware/validate');
 const { requireAdmin } = require('../middleware/auth');
 const users = require('../services/users');
+const adminConversations = require('../services/adminConversations');
 
 /**
  * Administrator-only user management.
@@ -202,6 +203,51 @@ router.delete(
         reassignTo: req.validatedQuery?.reassign || null,
       }),
     );
+  }),
+);
+
+/* -------------------------------------------------------------------------- */
+/* Conversation review                                                        */
+/* -------------------------------------------------------------------------- */
+
+// A separate window for administrators: own chats, other users' chats and
+// external widget chats. There is deliberately no reply/impersonation endpoint
+// here - this surface is read-only apart from deleting a conversation.
+router.get(
+  '/admin/conversations',
+  validateQuery(
+    z.object({
+      scope: z.enum(['mine', 'users', 'external', 'all']).optional().default('all'),
+      projectId: z.string().uuid().optional(),
+      userId: z.string().uuid().optional(),
+      search: z.string().trim().max(200).optional(),
+      limit: z.coerce.number().int().min(1).max(200).optional(),
+      offset: z.coerce.number().int().min(0).optional(),
+    }),
+  ),
+  asyncHandler(async (req, res) => {
+    res.json(
+      await adminConversations.list({
+        ...(req.validatedQuery || {}),
+        actorId: req.user.id,
+      }),
+    );
+  }),
+);
+
+router.get(
+  '/admin/conversations/:id',
+  validateUuidParam('id'),
+  asyncHandler(async (req, res) => {
+    res.json(await adminConversations.get(req.params.id));
+  }),
+);
+
+router.delete(
+  '/admin/conversations/:id',
+  validateUuidParam('id'),
+  asyncHandler(async (req, res) => {
+    res.json(await adminConversations.remove(req.params.id));
   }),
 );
 

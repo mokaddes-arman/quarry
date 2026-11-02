@@ -102,6 +102,8 @@ async function rollback() {
     DROP TABLE IF EXISTS message_sources CASCADE;
     DROP TABLE IF EXISTS messages CASCADE;
     DROP TABLE IF EXISTS conversations CASCADE;
+    DROP TABLE IF EXISTS embed_visitors CASCADE;
+    DROP TABLE IF EXISTS project_embeds CASCADE;
     DROP TABLE IF EXISTS document_chunks CASCADE;
     DROP TABLE IF EXISTS ingestion_jobs CASCADE;
     DROP TABLE IF EXISTS document_versions CASCADE;

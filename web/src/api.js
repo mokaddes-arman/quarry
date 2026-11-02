@@ -58,6 +58,24 @@ async function request(path, { method = 'GET', body, headers, signal } = {}) {
   return data;
 }
 
+/** Upload a single image under a specific multipart field name. */
+async function uploadImage(path, field, file) {
+  const fd = new FormData();
+  fd.append(field, file);
+  const res = await fetch(BASE + path, { method: 'POST', body: fd });
+  if (res.status === 401) window.dispatchEvent(new CustomEvent('rag:unauthorized'));
+  const data = await parse(res);
+  if (!res.ok) {
+    throw new ApiError(data?.error?.message || `Upload failed (${res.status})`, {
+      status: res.status,
+      code: data?.error?.code,
+      details: data?.error?.details,
+      body: data,
+    });
+  }
+  return data;
+}
+
 /** Upload one or more files as multipart (not JSON). Returns the raw body. */
 async function upload(path, fileOrFiles) {
   const fd = new FormData();
@@ -190,6 +208,38 @@ export const api = {
   conversationMessages: (id) => request(`/conversations/${id}/messages`),
   evidence: (id, body) => request(`/conversations/${id}/evidence`, { method: 'POST', body }),
 
+  // --- admin conversations ----------------------------------------------------
+  adminConversationsList: (params) => request(`/admin/conversations${qs(params)}`),
+  adminConversationGet: (id) => request(`/admin/conversations/${id}`),
+  adminConversationDelete: (id) => request(`/admin/conversations/${id}`, { method: 'DELETE' }),
+
+  // --- embeds (owner/admin) ---------------------------------------------------
+  getProjectEmbed: (projectId) => request(`/projects/${projectId}/embed`),
+  updateProjectEmbed: (projectId, body) => request(`/projects/${projectId}/embed`, { method: 'PATCH', body }),
+  rotateProjectEmbedKey: (projectId) => request(`/projects/${projectId}/embed/rotate-key`, { method: 'POST' }),
+  uploadProjectEmbedLogo: (projectId, file) =>
+    uploadImage(`/projects/${projectId}/embed/logo`, 'logo', file),
+  deleteProjectEmbedLogo: (projectId) => request(`/projects/${projectId}/embed/logo`, { method: 'DELETE' }),
+
+  // --- public embed -----------------------------------------------------------
+  publicEmbedConfig: (key) => request(`/public/embeds/${encodeURIComponent(key)}`),
+  publicEmbedLogoUrl: (key) => `${BASE}/public/embeds/${encodeURIComponent(key)}/logo`,
+  publicRegisterVisitor: (key, body) =>
+    request(`/public/embeds/${encodeURIComponent(key)}/visitors`, { method: 'POST', body }),
+  publicEmbedSession: (key, token) =>
+    request(`/public/embeds/${encodeURIComponent(key)}/session`, {
+      headers: { authorization: `Bearer ${token}` },
+    }),
+  publicCreateExternalConversation: (key, token) =>
+    request(`/public/embeds/${encodeURIComponent(key)}/conversations`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}` },
+    }),
+  publicConversationMessages: (key, conversationId, token) =>
+    request(`/public/embeds/${encodeURIComponent(key)}/conversations/${conversationId}/messages`, {
+      headers: { authorization: `Bearer ${token}` },
+    }),
+
   // --- providers --------------------------------------------------------------
   listLlmConfigs: () => request('/providers/llm'),
   createLlmConfig: (body) => request('/providers/llm', { method: 'POST', body }),
@@ -213,8 +263,6 @@ export const api = {
 
 /**
  * Ask a question and consume the Server-Sent Events stream.
- * `onEvent` receives each decoded event object. Returns the final 'done'/'error'
- * event so callers can react to completion.
  *
  * Two watchdogs protect the browser: if the server stops sending events for
  * `idleTimeoutMs`, or the whole exchange takes longer than `overallTimeoutMs`,
@@ -222,10 +270,17 @@ export const api = {
  * a spinner forever. A stream that ends without a terminal event is also
  * reported as an error.
  */
-export async function askStream(
-  conversationId,
+async function consumeAskStream(
+  url,
   body,
-  { onEvent, signal, idleTimeoutMs = 120000, overallTimeoutMs = 300000 } = {},
+  {
+    headers = {},
+    onEvent,
+    signal,
+    idleTimeoutMs = 120000,
+    overallTimeoutMs = 300000,
+    onUnauthorised,
+  } = {},
 ) {
   const controller = new AbortController();
   const abortWith = (reason) => {
@@ -252,15 +307,18 @@ export async function askStream(
   }, overallTimeoutMs);
 
   try {
-    const res = await fetch(`${BASE}/conversations/${conversationId}/messages`, {
+    const res = await fetch(url, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
+      headers: { 'content-type': 'application/json', accept: 'text/event-stream', ...headers },
       body: JSON.stringify({ ...body, stream: true }),
       signal: controller.signal,
     });
 
     if (!res.ok || !res.body) {
-      if (res.status === 401) window.dispatchEvent(new CustomEvent('rag:unauthorized'));
+      if (res.status === 401) {
+        if (onUnauthorised) onUnauthorised();
+        else window.dispatchEvent(new CustomEvent('rag:unauthorized'));
+      }
       const data = await parse(res);
       throw new ApiError(data?.error?.message || `Request failed (${res.status})`, {
         status: res.status,
@@ -330,6 +388,26 @@ export async function askStream(
     clearTimeout(overallTimer);
     if (signal) signal.removeEventListener?.('abort', onOuterAbort);
   }
+}
+
+export async function askStream(conversationId, body, options = {}) {
+  return consumeAskStream(`${BASE}/conversations/${conversationId}/messages`, body, options);
+}
+
+/**
+ * The public widget uses the same event protocol, but authenticates with its
+ * visitor token rather than a session cookie.
+ */
+export async function publicAskStream(key, conversationId, token, body, options = {}) {
+  return consumeAskStream(
+    `${BASE}/public/embeds/${encodeURIComponent(key)}/conversations/${conversationId}/messages`,
+    body,
+    {
+      ...options,
+      headers: { ...(options.headers || {}), authorization: `Bearer ${token}` },
+      onUnauthorised: options.onUnauthorised,
+    },
+  );
 }
 
 export { qs };

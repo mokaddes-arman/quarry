@@ -27,6 +27,7 @@ import {
   TrashIcon,
   UsersIcon,
   BookIcon,
+  GlobeIcon,
 } from './icons';
 import { formatNumber, formatRelative } from '../lib/format';
 
@@ -35,13 +36,20 @@ const NAV = [
   { id: 'documents', label: 'Documents', icon: DocIcon },
   { id: 'search', label: 'Search', icon: SearchIcon },
   { id: 'dashboard', label: 'Dashboard', icon: BookIcon },
+  { id: 'embed', label: 'Chat widget', icon: GlobeIcon, projectOwnerOnly: true },
   { id: 'admin', label: 'Admin', icon: UsersIcon, adminOnly: true },
+  {
+    id: 'admin-conversations',
+    label: 'Conversations',
+    icon: ChatIcon,
+    adminOnly: true,
+  },
   { id: 'model-usage', label: 'Model usage', icon: ChartIcon, adminOnly: true },
   { id: 'settings', label: 'Settings', icon: SettingsIcon, adminOnly: true },
 ];
 
 // Views that are not tied to a single project and stay available without one.
-const GLOBAL_VIEWS = ['settings', 'model-usage', 'admin'];
+const GLOBAL_VIEWS = ['settings', 'model-usage', 'admin', 'admin-conversations'];
 
 function NewProjectModal({ open, onClose }) {
   const { createProject } = useApp();
@@ -333,7 +341,17 @@ export function Sidebar() {
   const [archiving, setArchiving] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const navItems = useMemo(() => NAV.filter((item) => !item.adminOnly || isAdmin), [isAdmin]);
+  const navItems = useMemo(
+    () =>
+      NAV.filter((item) => {
+        if (item.adminOnly && !isAdmin) return false;
+        if (item.projectOwnerOnly) {
+          return Boolean(activeProject && (isAdmin || activeProject.owner_user_id === user?.id));
+        }
+        return true;
+      }),
+    [activeProject, isAdmin, user?.id],
+  );
 
   const sortedProjects = useMemo(
     () => [...projects].sort((a, b) => a.name.localeCompare(b.name)),

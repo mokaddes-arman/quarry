@@ -147,7 +147,8 @@ async function projectStats(projectId, { user = null } = {}) {
     conv_stats AS (
       SELECT COUNT(*) AS total_conversations,
              COUNT(*) FILTER (WHERE updated_at > now() - interval '7 days') AS recent_conversations
-      FROM conversations WHERE project_id = $1 AND archived = false${conversationOwner}
+      FROM conversations
+      WHERE project_id = $1 AND archived = false AND channel = 'internal'${conversationOwner}
     ),
     job_stats AS (
       SELECT COUNT(*) FILTER (WHERE status = 'queued') AS queued_jobs,
@@ -166,7 +167,8 @@ async function projectStats(projectId, { user = null } = {}) {
     ),
     recent_conversations AS (
       SELECT id, title, updated_at, created_at FROM conversations
-      WHERE project_id = $1 AND archived = false${conversationOwner} ORDER BY updated_at DESC LIMIT 8
+      WHERE project_id = $1 AND archived = false AND channel = 'internal'${conversationOwner}
+      ORDER BY updated_at DESC LIMIT 8
     ),
     storage AS (
       SELECT COALESCE(SUM(size_bytes), 0) AS total_bytes FROM document_versions WHERE project_id = $1

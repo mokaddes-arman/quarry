@@ -52,6 +52,24 @@ function buildRelativePath({ ownerUserId, projectId, documentId, versionNumber, 
   );
 }
 
+/**
+ * Widget logos live in a dedicated folder so they can be backed up, reviewed,
+ * or retained separately from uploaded knowledge-base documents. The folder is
+ * a prefix inside the configured bucket, so it reuses the same Supabase URL and
+ * service-role key as document storage.
+ */
+const EMBED_LOGO_PREFIX = 'external_logo';
+
+function buildEmbedLogoPath({ projectId, embedId, originalFilename, folder = EMBED_LOGO_PREFIX }) {
+  const safe = sanitiseFilename(originalFilename, 'logo.png');
+  return path.posix.join(
+    safeSegment(folder, EMBED_LOGO_PREFIX),
+    safeSegment(projectId, 'project'),
+    safeSegment(embedId, 'embed'),
+    `v1__${safe}`,
+  );
+}
+
 /** Reject keys that could escape an object prefix in either backend. */
 function assertStorageKey(relativePath) {
   const key = String(relativePath || '');
@@ -66,7 +84,9 @@ function assertStorageKey(relativePath) {
 }
 
 module.exports = {
+  EMBED_LOGO_PREFIX,
   sanitiseFilename,
   buildRelativePath,
+  buildEmbedLogoPath,
   assertStorageKey,
 };
