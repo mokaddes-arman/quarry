@@ -121,3 +121,68 @@ body {
 * {
   scrollbar-width: thin;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Public chat widget                                                         */
+/* -------------------------------------------------------------------------- */
+/* All widget-specific rules are namespaced. The widget itself is rendered in  */
+/* an iframe and the host launcher lives in a Shadow DOM, so these styles      */
+/* cannot leak into (or be overridden by) the surrounding website.             */
+.gs-rag-widget {
+  --gs-accent: #2563eb;
+  height: 100%;
+}
+
+.gs-rag-widget *,
+.gs-rag-widget *::before,
+.gs-rag-widget *::after {
+  box-sizing: border-box;
+}
+
+.gs-rag-widget .gs-rag-bubble {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.gs-rag-widget .markdown pre,
+.gs-rag-widget .markdown img {
+  max-width: 100%;
+}
+
+.gs-rag-widget .markdown img {
+  height: auto;
+}
+
+.gs-rag-widget .markdown table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.gs-rag-widget .gs-rag-messages {
+  overscroll-behavior: contain;
+}
+
+.gs-rag-widget .gs-typing-dot {
+  animation: gs-rag-typing 1.2s infinite ease-in-out;
+}
+
+@keyframes gs-rag-typing {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gs-rag-widget .gs-typing-dot {
+    animation: none;
+    opacity: 0.6;
+  }
+}

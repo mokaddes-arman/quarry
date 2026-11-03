@@ -78,7 +78,8 @@ test('a visitor can consent, identify themselves and chat without an account', a
     await widget.getByRole('button', { name: 'Start chat' }).click();
 
     // --- the consent form is replaced by the chat -------------------------
-    await expect(widget.getByText(`Chatting as ${visitorName}`)).toBeVisible();
+    await expect(widget.getByText('Online')).toBeVisible();
+    await expect(widget.getByText(visitorName)).toBeVisible();
     await expect(widget.getByText(welcomeMessage)).toBeVisible();
 
     const composer = widget.getByPlaceholder('Ask a question…');
@@ -90,7 +91,8 @@ test('a visitor can consent, identify themselves and chat without an account', a
 
     // --- the visitor token survives a reload ------------------------------
     await widget.reload();
-    await expect(widget.getByText(`Chatting as ${visitorName}`)).toBeVisible();
+    await expect(widget.getByText('Online')).toBeVisible();
+    await expect(widget.getByText(visitorName)).toBeVisible();
     await expect(widget.getByText(SAMPLE_QUESTION).first()).toBeVisible();
     await expect(widget.getByText(GROUNDED_ANSWER).first()).toBeVisible();
     await expect(widget.getByRole('button', { name: 'Start chat' })).toHaveCount(0);
