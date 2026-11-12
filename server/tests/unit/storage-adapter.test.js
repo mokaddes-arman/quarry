@@ -35,6 +35,17 @@ describe('storage: object keys', () => {
     expect(key).toBe('user-1/project-1/document-1/v2__Report.pdf');
   });
 
+  it('builds storage keys that stay within the ASCII-safe range Supabase accepts', () => {
+    const key = buildRelativePath({
+      ownerUserId: 'user-1',
+      projectId: 'project-1',
+      documentId: 'document-1',
+      versionNumber: 1,
+      originalFilename: 'eSignPro (Signer_Pro) — Product Assessment.pdf',
+    });
+    expect(key).toBe('user-1/project-1/document-1/v1__eSignPro (Signer_Pro) Product Assessment.pdf');
+  });
+
   it('keeps widget logos in the external_logo folder', () => {
     const key = buildEmbedLogoPath({
       projectId: 'project-1',

@@ -20,7 +20,10 @@ function sanitiseFilename(name, fallback = 'document') {
   base = base.replace(/[\u0000-\u001f\u007f]/g, '');
   base = base.replace(/[<>:"/\\|?*]/g, '_');
   base = base.replace(/\.+$/, '');
-  base = base.trim().replace(/\s+/g, ' ');
+  // Supabase Storage only accepts ASCII-safe object keys and rejects anything
+  // else with a 400 "InvalidKey" from the Storage API. Non-ASCII characters
+  // (accents, dashes, CJK, ...) must therefore not reach the storage backend.
+  base = base.replace(/[^\x20-\x7e]/g, '').trim().replace(/\s+/g, ' ');
   if (!base) base = fallback;
   const ext = path.extname(base);
   const stemRaw = path.basename(base, ext);

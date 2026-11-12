@@ -25,6 +25,11 @@ describe('security hardening', () => {
     expect(storage.sanitiseFilename('')).toBe('document');
     // Control characters and shell metacharacters are removed/normalised.
     expect(storage.sanitiseFilename('a\u0000b<>.txt')).toBe('ab__.txt');
+    // Supabase Storage rejects non-ASCII object keys with a 400 InvalidKey.
+    expect(storage.sanitiseFilename('eSignPro (Signer_Pro) — Product Assessment.pdf')).toBe(
+      'eSignPro (Signer_Pro) Product Assessment.pdf',
+    );
+    expect(storage.sanitiseFilename('Résumé — Draft.pdf')).toBe('Rsum Draft.pdf');
   });
 
   it('refuses to resolve a path outside the storage root', () => {
