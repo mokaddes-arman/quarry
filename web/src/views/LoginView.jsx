@@ -19,6 +19,15 @@ import { AlertIcon, BookIcon, Spinner } from '../components/icons';
  * is removed from the address bar before any request is made.
  */
 
+/**
+ * Shared demo account so visitors can try the messaging without an invitation.
+ * It is a regular (non-admin) user; its credentials are intentionally public.
+ */
+const DEMO_ACCOUNT = {
+  email: 'mokaddes.arman.2111+testuser@gmail.com',
+  password: 'Mokaddes@123',
+};
+
 function tokenFromHash(hash) {
   const raw = String(hash || '').replace(/^#/, '');
   if (!raw) return null;
@@ -123,6 +132,23 @@ export function LoginView() {
     setNotice(null);
     try {
       await loginWithPassword({ email: email.trim(), password });
+      setMode('done');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const signInAsDemo = async () => {
+    setFormMode('password');
+    setEmail(DEMO_ACCOUNT.email);
+    setPassword(DEMO_ACCOUNT.password);
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await loginWithPassword({ email: DEMO_ACCOUNT.email, password: DEMO_ACCOUNT.password });
       setMode('done');
     } catch (err) {
       setError(err.message);
@@ -460,6 +486,31 @@ export function LoginView() {
             </form>
           )}
         </div>
+
+        {mode === 'form' && !setupRequired && (
+          <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-4 text-xs text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
+            <p className="font-semibold">Just want to try it? Use the demo account</p>
+            <dl className="mt-2 space-y-1">
+              <div className="flex flex-wrap gap-x-2">
+                <dt className="text-blue-700 dark:text-blue-300">Email:</dt>
+                <dd className="break-all font-mono select-all">{DEMO_ACCOUNT.email}</dd>
+              </div>
+              <div className="flex flex-wrap gap-x-2">
+                <dt className="text-blue-700 dark:text-blue-300">Password:</dt>
+                <dd className="font-mono select-all">{DEMO_ACCOUNT.password}</dd>
+              </div>
+            </dl>
+            <Button
+              type="button"
+              variant="secondary"
+              className="mt-3 w-full"
+              onClick={signInAsDemo}
+              disabled={busy}
+            >
+              Use demo account
+            </Button>
+          </div>
+        )}
 
         <p className="mt-4 text-center text-[11px] text-slate-500 dark:text-slate-500">
           Accounts are created by an administrator. If you cannot sign in, ask them to send you a

@@ -14,6 +14,18 @@ citations** and **strict per-project isolation**.
   logged in plaintext.
 - Everything runs on your machine. Documents, vectors and history stay local.
 
+### Demo account
+
+Want to try the messaging without an invitation? Sign in with the shared demo account
+(also shown on the login page, with a one-click **Use demo account** button):
+
+| Field    | Value                                    |
+| -------- | ---------------------------------------- |
+| Email    | `mokaddes.arman.2111+testuser@gmail.com` |
+| Password | `Mokaddes@123`                           |
+
+This is a regular (non-admin) user. Do not upload anything sensitive while signed in with it.
+
 ---
 
 ## Contents
