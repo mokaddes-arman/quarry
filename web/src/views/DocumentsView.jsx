@@ -504,7 +504,7 @@ export function DocumentsView() {
               className={cn(
                 'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
                 tab === t.id
-                  ? 'bg-brand-600 text-white'
+                  ? 'bg-brand-600 text-white dark:text-slate-950'
                   : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
               )}
             >

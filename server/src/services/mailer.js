@@ -82,17 +82,17 @@ async function sendLoginLink({ to, name, url, expiresAt, purpose = 'login' }) {
   ].join('\n');
 
   const html = `<!doctype html>
-<html><body style="margin:0;padding:24px;background:#f8fafc;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#0f172a">
-  <div style="max-width:520px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:28px">
+<html><body style="margin:0;padding:24px;background:#F5F3ED;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#172A3A">
+  <div style="max-width:520px;margin:0 auto;background:#ffffff;border:1px solid #E0DCD2;border-radius:12px;padding:28px">
     <p style="margin:0 0 16px;font-size:16px">${escapeHtml(greeting)}</p>
     <p style="margin:0 0 20px;font-size:15px;line-height:1.5">${escapeHtml(intro)}</p>
     <p style="margin:0 0 24px">
-      <a href="${escapeHtml(url)}" style="display:inline-block;background:#2F5D62;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Sign in</a>
+      <a href="${escapeHtml(url)}" style="display:inline-block;background:#172A3A;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Sign in</a>
     </p>
-    <p style="margin:0 0 8px;font-size:13px;color:#475569;line-height:1.5">
+    <p style="margin:0 0 8px;font-size:13px;color:#56657A;line-height:1.5">
       This link can be used once and expires in ${minutes} minute${minutes === 1 ? '' : 's'}.
     </p>
-    <p style="margin:0;font-size:12px;color:#94a3b8;line-height:1.5">
+    <p style="margin:0;font-size:12px;color:#718096;line-height:1.5">
       If the button does not work, paste this address into your browser:<br>
       <span style="word-break:break-all">${escapeHtml(url)}</span>
     </p>

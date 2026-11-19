@@ -18,7 +18,7 @@ export function cn(...parts) {
 
 const BUTTON_VARIANTS = {
   primary:
-    'bg-brand-600 text-white hover:bg-brand-700 disabled:bg-brand-400 dark:disabled:bg-brand-900',
+    'bg-brand-600 text-white hover:bg-brand-700 disabled:bg-brand-400 dark:text-slate-950 dark:disabled:bg-slate-700 dark:disabled:text-slate-400',
   secondary:
     'bg-slate-100 text-slate-800 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700',
   danger: 'bg-red-600 text-white hover:bg-red-700 disabled:bg-red-400',
@@ -123,7 +123,7 @@ const BADGE_TONES = {
   red: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
   blue: 'bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300',
   brand: 'bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300',
-  ochre: 'bg-ochre-300/40 text-ochre-700 dark:bg-ochre-500/15 dark:text-ochre-300',
+  brass: 'bg-brass-300/40 text-brass-700 dark:bg-brass-500/15 dark:text-brass-300',
 };
 
 export function Badge({ tone = 'slate', className = '', children }) {

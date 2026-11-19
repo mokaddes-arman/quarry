@@ -69,7 +69,7 @@ const updateSchema = z
     themeColor: z
       .string()
       .trim()
-      .regex(/^#[0-9a-fA-F]{6}$/, 'Use a six-digit hex colour such as #2F5D62.')
+      .regex(/^#[0-9a-fA-F]{6}$/, 'Use a six-digit hex colour such as #172A3A.')
       .optional(),
     welcomeMessage: z.string().trim().max(1000).optional().nullable(),
     consentRequired: z.boolean().optional(),

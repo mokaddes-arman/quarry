@@ -267,12 +267,12 @@ export function LoginView() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-limestone px-4 py-10 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+    <div className="flex min-h-screen items-center justify-center bg-ivory px-4 py-10 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <div className="w-full max-w-md">
         <div className="mb-6 flex items-center gap-3">
           <LogoMark size={44} className="shrink-0" />
           <div>
-            <h1 className="text-2xl leading-tight text-brand-950 dark:text-slate-50">
+            <h1 className="text-2xl leading-tight text-slate-900 dark:text-slate-50">
               <Wordmark />
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400">

@@ -4,8 +4,8 @@
   "description": "Ask questions of your team's documents and get answers with their sources.",
   "start_url": "/",
   "display": "standalone",
-  "theme_color": "#2F5D62",
-  "background_color": "#F5F3EE",
+  "theme_color": "#172A3A",
+  "background_color": "#F5F3ED",
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },

@@ -33,7 +33,7 @@ function SourceRow({ source, onInspect }) {
   return (
     <li className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
       <div className="flex items-start gap-2">
-        <Badge tone="ochre" className="mt-0.5 shrink-0 tabular-nums">
+        <Badge tone="brass" className="mt-0.5 shrink-0 tabular-nums">
           [{s.rank ?? '?'}]
         </Badge>
         <div className="min-w-0 flex-1">

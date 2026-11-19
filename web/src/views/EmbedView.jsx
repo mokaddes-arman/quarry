@@ -39,7 +39,7 @@ function emptyForm(projectId) {
     brandName: '',
     slogan: '',
     logoUrl: '',
-    themeColor: '#2F5D62',
+    themeColor: '#172A3A',
     welcomeMessage: '',
     allowedOrigins: '',
     consentRequired: true,
@@ -61,7 +61,7 @@ function formFromEmbed(embed) {
     brandName: embed.brandName || '',
     slogan: embed.slogan || '',
     logoUrl: embed.logoUrl || '',
-    themeColor: embed.themeColor || '#2F5D62',
+    themeColor: embed.themeColor || '#172A3A',
     welcomeMessage: embed.welcomeMessage || '',
     allowedOrigins: (embed.allowedOrigins || []).join('\n'),
     consentRequired: embed.consentRequired,
@@ -309,7 +309,7 @@ export function EmbedView() {
                   placeholder={activeProject.name}
                 />
               </Field>
-              <Field label="Theme colour" hint="Six-digit hex, e.g. #2F5D62.">
+              <Field label="Theme colour" hint="Six-digit hex, e.g. #172A3A.">
                 <div className="flex items-center gap-2">
                   <input
                     type="color"

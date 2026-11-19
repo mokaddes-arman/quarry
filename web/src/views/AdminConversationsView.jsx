@@ -64,7 +64,7 @@ function MessageBubble({ message, sources }) {
           className={cn(
             'inline-block max-w-full rounded-2xl border px-4 py-3 text-left',
             isUser
-              ? 'rounded-br-sm border-brand-600 bg-brand-600 text-sm text-white'
+              ? 'rounded-br-sm border-brand-600 bg-brand-600 text-sm text-white dark:text-slate-950'
               : failed
                 ? 'rounded-bl-sm border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/40'
                 : 'rounded-bl-sm border-slate-200 bg-white text-sm dark:border-slate-700 dark:bg-slate-900',

@@ -128,7 +128,7 @@ function WidgetHeader({
   return (
     <header
       className="relative z-20 flex shrink-0 items-center gap-2 px-3 py-2 text-white"
-      style={{ backgroundColor: config.themeColor || '#2F5D62' }}
+      style={{ backgroundColor: config.themeColor || '#172A3A' }}
     >
       {logo ? (
         <img
@@ -333,7 +333,7 @@ function VisitorForm({ config, embedKey, onRegistered, notice }) {
                 target="_blank"
                 rel="noreferrer noopener"
                 className="mt-1 inline-block text-xs font-medium underline"
-                style={{ color: config.themeColor || '#2F5D62' }}
+                style={{ color: config.themeColor || '#172A3A' }}
               >
                 Read the privacy policy
               </a>
@@ -450,7 +450,7 @@ function ChatPane({
   const composerRef = useRef(null);
   const controllerRef = useRef(null);
 
-  const accent = config.themeColor || '#2F5D62';
+  const accent = config.themeColor || '#172A3A';
 
   const sourcesByMessage = useMemo(() => {
     const map = new Map();

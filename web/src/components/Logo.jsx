@@ -14,11 +14,11 @@ export function LogoMark({ size = 32, className = '', title = BRAND_NAME }) {
       aria-label={title}
       focusable="false"
     >
-      <rect width="64" height="64" rx="14" fill="#2F5D62" />
-      <path d="M11 27 20 14h24l9 13z" fill="#D9A441" />
-      <path d="M20 14h8l-4 13H11z" fill="#EBC77F" />
-      <path d="M11 27h42L26 52z" fill="#F5F3EE" />
-      <path d="M31 27h22L26 52z" fill="#CFC8B8" />
+      <rect width="64" height="64" rx="14" fill="#172A3A" />
+      <path d="M11 27 20 14h24l9 13z" fill="#C49A5A" />
+      <path d="M20 14h8l-4 13H11z" fill="#D4B381" />
+      <path d="M11 27h42L26 52z" fill="#F5F3ED" />
+      <path d="M31 27h22L26 52z" fill="#D9D3C5" />
     </svg>
   );
 }

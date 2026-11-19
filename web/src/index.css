@@ -3,27 +3,52 @@
 /* Class-based dark mode (Tailwind v4 defaults to prefers-color-scheme). */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Quarry brand palette: slate teal (brand) + ochre (accent). See brand/BRAND.md. */
+/* Quarry palette: Deep Navy #172A3A, Warm Ivory #F5F3ED, Muted Brass #C49A5A,
+   Slate #718096. See brand/BRAND.md. */
 @theme {
-  --color-brand-50: #f1f6f6;
-  --color-brand-100: #dce9ea;
-  --color-brand-200: #bad3d5;
-  --color-brand-300: #8fb5b8;
-  --color-brand-400: #5f9095;
-  --color-brand-500: #43747a;
-  --color-brand-600: #2f5d62;
-  --color-brand-700: #274d51;
-  --color-brand-800: #213f43;
-  --color-brand-900: #1c3437;
-  --color-brand-950: #16292b;
+  /* Neutrals (replaces Tailwind's slate): warm ivory at the light end, deep navy
+     at the dark end, so every existing slate-* class picks up the palette. */
+  --color-slate-50: #f5f3ed; /* Warm Ivory */
+  --color-slate-100: #edeae2;
+  --color-slate-200: #e0dcd2;
+  --color-slate-300: #cacbc9;
+  --color-slate-400: #9aa4b1;
+  --color-slate-500: #718096; /* Slate */
+  --color-slate-600: #56657a;
+  --color-slate-700: #3e4e61;
+  --color-slate-800: #283b4c;
+  --color-slate-900: #172a3a; /* Deep Navy */
+  --color-slate-950: #0f1e2b;
 
-  --color-ochre-300: #ebc77f;
-  --color-ochre-400: #e2b55c;
-  --color-ochre-500: #d9a441;
-  --color-ochre-600: #b9862b;
-  --color-ochre-700: #93681f;
+  /* Primary: Deep Navy. */
+  --color-brand-50: #eef1f4;
+  --color-brand-100: #dce2e8;
+  --color-brand-200: #b9c5d0;
+  --color-brand-300: #93a4b5;
+  --color-brand-400: #718096;
+  --color-brand-500: #3f5468;
+  --color-brand-600: #172a3a;
+  --color-brand-700: #0e1c28;
+  --color-brand-800: #0b1620;
+  --color-brand-900: #081119;
+  --color-brand-950: #050b10;
 
-  --color-limestone: #f5f3ee;
+  /* Accent: Muted Brass. */
+  --color-brass-300: #e2cca6;
+  --color-brass-400: #d4b381;
+  --color-brass-500: #c49a5a;
+  --color-brass-600: #a88043;
+  --color-brass-700: #7d5f31;
+
+  --color-ivory: #f5f3ed;
+}
+
+/* In dark mode the surfaces are navy, so a navy primary would disappear.
+   Primary actions, focus rings and accent icons switch to brass instead. */
+.dark {
+  --color-brand-500: #c49a5a;
+  --color-brand-600: #c49a5a;
+  --color-brand-700: #d4b381;
 }
 
 :root {
@@ -104,8 +129,8 @@ body {
   border-radius: 0.25rem;
 }
 .markdown pre {
-  background: #0f172a;
-  color: #e2e8f0;
+  background: #0f1e2b;
+  color: #edeae2;
   padding: 0.75rem 1rem;
   border-radius: 0.5rem;
   overflow-x: auto;
@@ -152,7 +177,7 @@ body {
 /* an iframe and the host launcher lives in a Shadow DOM, so these styles      */
 /* cannot leak into (or be overridden by) the surrounding website.             */
 .quarry-widget {
-  --quarry-accent: #2f5d62;
+  --quarry-accent: #172a3a;
   height: 100%;
 }
 
