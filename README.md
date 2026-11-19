@@ -465,8 +465,8 @@ You can use either option:
 | Start command | `npm start` |
 | Health check path | `/api/health` |
 
-`--include=dev` is required. The web build uses Vite, a dev dependency, and npm skips dev
-dependencies when `NODE_ENV=production`.
+Vite and Tailwind are regular dependencies, so the build also works with Render's default
+`npm install; npm run build`. `--include=dev` just installs the test tooling as well.
 
 ### 2. Environment variables
 
