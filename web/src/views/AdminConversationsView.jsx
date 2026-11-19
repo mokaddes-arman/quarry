@@ -64,7 +64,7 @@ function MessageBubble({ message, sources }) {
           className={cn(
             'inline-block max-w-full rounded-2xl border px-4 py-3 text-left',
             isUser
-              ? 'rounded-br-sm border-blue-600 bg-blue-600 text-sm text-white'
+              ? 'rounded-br-sm border-brand-600 bg-brand-600 text-sm text-white'
               : failed
                 ? 'rounded-bl-sm border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/40'
                 : 'rounded-bl-sm border-slate-200 bg-white text-sm dark:border-slate-700 dark:bg-slate-900',
@@ -210,7 +210,7 @@ export function AdminConversationsView() {
         <div className="mx-auto flex max-w-7xl flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="flex items-center gap-2 text-lg font-semibold">
-              <ShieldIcon className="h-5 w-5 text-blue-600" /> Conversation review
+              <ShieldIcon className="h-5 w-5 text-brand-600" /> Conversation review
             </h1>
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
               Read-only access to internal and widget conversations. Administrators can delete a
@@ -243,7 +243,7 @@ export function AdminConversationsView() {
                       className={cn(
                         'flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium',
                         active
-                          ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-200'
+                          ? 'bg-brand-50 text-brand-700 dark:bg-brand-950/50 dark:text-brand-200'
                           : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
                       )}
                     >
@@ -327,7 +327,7 @@ export function AdminConversationsView() {
                           className={cn(
                             'w-full px-3 py-2.5 text-left',
                             active
-                              ? 'bg-blue-50 dark:bg-blue-950/40'
+                              ? 'bg-brand-50 dark:bg-brand-950/40'
                               : 'hover:bg-slate-50 dark:hover:bg-slate-800/60',
                           )}
                         >

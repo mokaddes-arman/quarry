@@ -22,7 +22,7 @@ const {
 
 /** Write the sample document to a temp file so `setInputFiles` can use it. */
 function writeSampleDocument() {
-  const file = path.join(os.tmpdir(), `global-softel-e2e-${Date.now()}.md`);
+  const file = path.join(os.tmpdir(), `quarry-e2e-${Date.now()}.md`);
   fs.writeFileSync(file, SAMPLE_DOCUMENT, 'utf8');
   return file;
 }

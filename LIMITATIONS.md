@@ -1,4 +1,4 @@
-# Global Softel RAG Chat — Limitations & Known Gaps
+# Quarry — Limitations & Known Gaps
 
 > A single, honest list of everything this app does **not** do well yet, so we can work
 > through it one by one. Nothing here is hidden in code comments — if it can bite you, it is
@@ -27,8 +27,8 @@
   `PATH` on this machine. The app does not need them, but you cannot use native PostgreSQL
   tooling or Ollama embeddings without installing them.
   *Work on it:* `npm run setup` reports status; install as needed.
-- [x] **A2 — Version control (resolved).** The folder is now a git repository on the
-  `global-softel` branch, with `.env`, `storage/`, uploads and the embedded database
+- [x] **A2 — Version control (resolved).** The folder is now a git repository, hosted at
+  `github.com/mokaddes-arman/quarry` (`main` branch), with `.env`, `storage/`, uploads and the embedded database
   ignored.
 - [ ] **A3 — Master key required to save providers (Medium).** If `APP_MASTER_KEY` is missing
   or left as the placeholder, saving an LLM/embedding provider fails because keys cannot be

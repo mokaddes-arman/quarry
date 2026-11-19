@@ -3,6 +3,29 @@
 /* Class-based dark mode (Tailwind v4 defaults to prefers-color-scheme). */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Quarry brand palette: slate teal (brand) + ochre (accent). See brand/BRAND.md. */
+@theme {
+  --color-brand-50: #f1f6f6;
+  --color-brand-100: #dce9ea;
+  --color-brand-200: #bad3d5;
+  --color-brand-300: #8fb5b8;
+  --color-brand-400: #5f9095;
+  --color-brand-500: #43747a;
+  --color-brand-600: #2f5d62;
+  --color-brand-700: #274d51;
+  --color-brand-800: #213f43;
+  --color-brand-900: #1c3437;
+  --color-brand-950: #16292b;
+
+  --color-ochre-300: #ebc77f;
+  --color-ochre-400: #e2b55c;
+  --color-ochre-500: #d9a441;
+  --color-ochre-600: #b9862b;
+  --color-ochre-700: #93681f;
+
+  --color-limestone: #f5f3ee;
+}
+
 :root {
   color-scheme: light;
 }
@@ -67,11 +90,11 @@ body {
   list-style: decimal;
 }
 .markdown a {
-  color: #2563eb;
+  color: var(--color-brand-600);
   text-decoration: underline;
 }
 .dark .markdown a {
-  color: #60a5fa;
+  color: var(--color-brand-300);
 }
 .markdown code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -128,46 +151,46 @@ body {
 /* All widget-specific rules are namespaced. The widget itself is rendered in  */
 /* an iframe and the host launcher lives in a Shadow DOM, so these styles      */
 /* cannot leak into (or be overridden by) the surrounding website.             */
-.gs-rag-widget {
-  --gs-accent: #2563eb;
+.quarry-widget {
+  --quarry-accent: #2f5d62;
   height: 100%;
 }
 
-.gs-rag-widget *,
-.gs-rag-widget *::before,
-.gs-rag-widget *::after {
+.quarry-widget *,
+.quarry-widget *::before,
+.quarry-widget *::after {
   box-sizing: border-box;
 }
 
-.gs-rag-widget .gs-rag-bubble {
+.quarry-widget .quarry-bubble {
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
-.gs-rag-widget .markdown pre,
-.gs-rag-widget .markdown img {
+.quarry-widget .markdown pre,
+.quarry-widget .markdown img {
   max-width: 100%;
 }
 
-.gs-rag-widget .markdown img {
+.quarry-widget .markdown img {
   height: auto;
 }
 
-.gs-rag-widget .markdown table {
+.quarry-widget .markdown table {
   display: block;
   max-width: 100%;
   overflow-x: auto;
 }
 
-.gs-rag-widget .gs-rag-messages {
+.quarry-widget .quarry-messages {
   overscroll-behavior: contain;
 }
 
-.gs-rag-widget .gs-typing-dot {
-  animation: gs-rag-typing 1.2s infinite ease-in-out;
+.quarry-widget .quarry-typing-dot {
+  animation: quarry-typing 1.2s infinite ease-in-out;
 }
 
-@keyframes gs-rag-typing {
+@keyframes quarry-typing {
   0%,
   80%,
   100% {
@@ -181,7 +204,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .gs-rag-widget .gs-typing-dot {
+  .quarry-widget .quarry-typing-dot {
     animation: none;
     opacity: 0.6;
   }

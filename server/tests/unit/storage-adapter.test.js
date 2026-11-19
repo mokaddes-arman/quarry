@@ -8,7 +8,7 @@ const { buildRelativePath, buildEmbedLogoPath, EMBED_LOGO_PREFIX } = require('..
 const SETTINGS = {
   url: 'https://example.supabase.co',
   serviceRoleKey: 'service-role-secret',
-  bucket: 'rag-documents',
+  bucket: 'quarry-documents',
 };
 
 function response({ ok = true, status = 200, json = null, body = null, headers = {} } = {}) {
@@ -69,7 +69,7 @@ describe('storage: object keys', () => {
 
 describe('storage: Supabase REST adapter', () => {
   it('uploads a local temp file to the private bucket and removes the temp file', async () => {
-    const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'rag-supabase-'));
+    const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'quarry-supabase-'));
     const temp = path.join(dir, 'upload.txt');
     await fsp.writeFile(temp, 'hello');
 
@@ -82,7 +82,7 @@ describe('storage: Supabase REST adapter', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     const [url, options] = fetchImpl.mock.calls[0];
     expect(url).toBe(
-      'https://example.supabase.co/storage/v1/object/rag-documents/user-1/project-1/document-1/v1__upload.txt',
+      'https://example.supabase.co/storage/v1/object/quarry-documents/user-1/project-1/document-1/v1__upload.txt',
     );
     expect(options.method).toBe('POST');
     expect(options.headers.apikey).toBe(SETTINGS.serviceRoleKey);
@@ -105,7 +105,7 @@ describe('storage: Supabase REST adapter', () => {
 
     expect(buffer.toString('utf8')).toBe('stored bytes');
     const [url, options] = fetchImpl.mock.calls[0];
-    expect(url).toContain('/storage/v1/object/rag-documents/');
+    expect(url).toContain('/storage/v1/object/quarry-documents/');
     expect(options.method).toBe('GET');
     expect(options.headers.authorization).toBeUndefined();
     expect(options.headers.apikey).toBe(SETTINGS.serviceRoleKey);
@@ -175,8 +175,8 @@ describe('storage: Supabase REST adapter', () => {
 
     const deleted = calls.filter((call) => call.options.method === 'DELETE').map((call) => call.url);
     expect(deleted).toEqual([
-      'https://example.supabase.co/storage/v1/object/rag-documents/user-1/project-1/document-1/v1__a.txt',
-      'https://example.supabase.co/storage/v1/object/rag-documents/user-1/project-1/document-1/v2__b.txt',
+      'https://example.supabase.co/storage/v1/object/quarry-documents/user-1/project-1/document-1/v1__a.txt',
+      'https://example.supabase.co/storage/v1/object/quarry-documents/user-1/project-1/document-1/v2__b.txt',
     ]);
     expect(calls.every((call) => !call.url.includes(SETTINGS.serviceRoleKey))).toBe(true);
   });

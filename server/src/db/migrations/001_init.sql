@@ -1,5 +1,5 @@
 -- =============================================================================
--- 001_init.sql - core schema for Global Softel RAG Chat
+-- 001_init.sql - core schema for Quarry
 --
 -- Runs unchanged on a real PostgreSQL server (>= 14 + pgvector) and on the
 -- embedded PGlite build (real Postgres compiled to WASM + real pgvector).

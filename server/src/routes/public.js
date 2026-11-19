@@ -294,7 +294,7 @@ router.get('/embed.js', (req, res) => {
   }
 
   const script = `(function () {
-  if (document.getElementById('gs-rag-widget')) return;
+  if (document.getElementById('quarry-widget')) return;
   var current = document.currentScript;
   if (!current) {
     var all = document.getElementsByTagName('script');
@@ -307,7 +307,7 @@ router.get('/embed.js', (req, res) => {
   var api = base + '/api/public/embeds/' + encodeURIComponent(key);
 
   var host = document.createElement('div');
-  host.id = 'gs-rag-widget';
+  host.id = 'quarry-widget';
   host.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;z-index:2147483000;';
 
   var root = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
@@ -315,33 +315,33 @@ router.get('/embed.js', (req, res) => {
   var styles = [
     ':host { all: initial; }',
     '*, *::before, *::after { box-sizing: border-box; }',
-    '.gs-panel { position: fixed; right: 24px; bottom: 90px; width: 360px; height: 520px; max-height: calc(100vh - 110px); border-radius: 12px; overflow: hidden; background: #0f172a; box-shadow: 0 18px 50px rgba(15,23,42,.35), 0 4px 12px rgba(15,23,42,.25); opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(14px) scale(.98); transform-origin: bottom right; transition: opacity 180ms ease, transform 180ms ease, visibility 180ms ease; z-index: 2147483001; }',
-    '.gs-panel.is-open { opacity: 1; visibility: visible; pointer-events: auto; transform: translateY(0) scale(1); }',
-    '.gs-panel iframe { display: block; width: 100%; height: 100%; border: 0; background: #0f172a; }',
-    '.gs-launcher { position: fixed; right: 24px; bottom: 24px; display: flex; align-items: center; justify-content: center; width: 56px; height: 56px; padding: 0; border: 0; border-radius: 9999px; background: #2563eb; color: #fff; cursor: pointer; box-shadow: 0 12px 28px rgba(37,99,235,.38); transition: transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease; z-index: 2147483000; }',
-    '.gs-launcher:hover { transform: translateY(-2px); box-shadow: 0 16px 32px rgba(37,99,235,.45); }',
-    '.gs-launcher:focus-visible { outline: 3px solid #93c5fd; outline-offset: 3px; }',
-    '.gs-launcher svg { display: block; width: 26px; height: 26px; }',
+    '.quarry-panel { position: fixed; right: 24px; bottom: 90px; width: 360px; height: 520px; max-height: calc(100vh - 110px); border-radius: 12px; overflow: hidden; background: #0f172a; box-shadow: 0 18px 50px rgba(15,23,42,.35), 0 4px 12px rgba(15,23,42,.25); opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(14px) scale(.98); transform-origin: bottom right; transition: opacity 180ms ease, transform 180ms ease, visibility 180ms ease; z-index: 2147483001; }',
+    '.quarry-panel.is-open { opacity: 1; visibility: visible; pointer-events: auto; transform: translateY(0) scale(1); }',
+    '.quarry-panel iframe { display: block; width: 100%; height: 100%; border: 0; background: #0f172a; }',
+    '.quarry-launcher { position: fixed; right: 24px; bottom: 24px; display: flex; align-items: center; justify-content: center; width: 56px; height: 56px; padding: 0; border: 0; border-radius: 9999px; background: #2F5D62; color: #fff; cursor: pointer; box-shadow: 0 12px 28px rgba(47,93,98,.38); transition: transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease; z-index: 2147483000; }',
+    '.quarry-launcher:hover { transform: translateY(-2px); box-shadow: 0 16px 32px rgba(47,93,98,.45); }',
+    '.quarry-launcher:focus-visible { outline: 3px solid #8FB5B8; outline-offset: 3px; }',
+    '.quarry-launcher svg { display: block; width: 26px; height: 26px; }',
     '@media (max-width: 480px) {',
-    '  .gs-panel { right: 0; bottom: 0; width: 100vw; height: 100vh; height: 100dvh; max-height: none; border-radius: 0; }',
-    '  .gs-launcher { right: 16px; bottom: 16px; }',
+    '  .quarry-panel { right: 0; bottom: 0; width: 100vw; height: 100vh; height: 100dvh; max-height: none; border-radius: 0; }',
+    '  .quarry-launcher { right: 16px; bottom: 16px; }',
     '}',
     '@media (prefers-reduced-motion: reduce) {',
-    '  .gs-panel, .gs-launcher { transition: none; }',
+    '  .quarry-panel, .quarry-launcher { transition: none; }',
     '}'
   ].join('\\n');
 
   var icon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>';
 
   root.innerHTML = '<style>' + styles + '</style>' +
-    '<div class="gs-panel" id="gs-panel" aria-hidden="true">' +
-      '<iframe id="gs-frame" title="Chat with us" allow="clipboard-write"></iframe>' +
+    '<div class="quarry-panel" id="quarry-panel" aria-hidden="true">' +
+      '<iframe id="quarry-frame" title="Chat with us" allow="clipboard-write"></iframe>' +
     '</div>' +
-    '<button type="button" class="gs-launcher" id="gs-launcher" aria-label="Open chat" aria-expanded="false" aria-controls="gs-panel">' + icon + '</button>';
+    '<button type="button" class="quarry-launcher" id="quarry-launcher" aria-label="Open chat" aria-expanded="false" aria-controls="quarry-panel">' + icon + '</button>';
 
-  var panel = root.querySelector('#gs-panel');
-  var frame = root.querySelector('#gs-frame');
-  var button = root.querySelector('#gs-launcher');
+  var panel = root.querySelector('#quarry-panel');
+  var frame = root.querySelector('#quarry-frame');
+  var button = root.querySelector('#quarry-launcher');
   panel.inert = true;
   frame.src = base + '/embed/' + encodeURIComponent(key);
 
@@ -349,7 +349,7 @@ router.get('/embed.js', (req, res) => {
 
   function focusInput() {
     if (!isOpen) return;
-    try { frame.contentWindow.postMessage({ type: 'gs-rag-widget:focus' }, base); } catch (e) {}
+    try { frame.contentWindow.postMessage({ type: 'quarry-widget:focus' }, base); } catch (e) {}
   }
 
   function setOpen(next, restoreFocus) {
@@ -373,8 +373,8 @@ router.get('/embed.js', (req, res) => {
   window.addEventListener('message', function (event) {
     if (event.origin !== base) return;
     var data = event.data || {};
-    if (data.type === 'gs-rag-widget:close') setOpen(false, true);
-    if (data.type === 'gs-rag-widget:focus') focusInput();
+    if (data.type === 'quarry-widget:close') setOpen(false, true);
+    if (data.type === 'quarry-widget:focus') focusInput();
   });
 
   document.addEventListener('keydown', function (event) {

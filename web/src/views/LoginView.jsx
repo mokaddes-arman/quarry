@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { useApp } from '../store';
 import { Button, Field, Input, cn } from '../components/ui';
-import { AlertIcon, BookIcon, Spinner } from '../components/icons';
+import { AlertIcon, Spinner } from '../components/icons';
+import { LogoMark, Wordmark } from '../components/Logo';
 
 /**
  * Sign-in.
@@ -266,16 +267,16 @@ export function LoginView() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-10 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+    <div className="flex min-h-screen items-center justify-center bg-limestone px-4 py-10 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <div className="w-full max-w-md">
         <div className="mb-6 flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600 text-white">
-            <BookIcon className="h-5 w-5" />
-          </span>
+          <LogoMark size={44} className="shrink-0" />
           <div>
-            <h1 className="text-lg font-semibold leading-tight">Global Softel RAG Chat</h1>
+            <h1 className="text-2xl leading-tight text-brand-950 dark:text-slate-50">
+              <Wordmark />
+            </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Private, project-scoped document assistant
+              Answers from your documents, with the page they came from.
             </p>
           </div>
         </div>
@@ -469,7 +470,7 @@ export function LoginView() {
                 <div className="flex justify-end">
                   <button
                     type="button"
-                    className="text-xs text-blue-600 hover:underline dark:text-blue-400"
+                    className="text-xs text-brand-600 hover:underline dark:text-brand-300"
                     onClick={() => switchForm('forgot')}
                   >
                     Forgot password?
@@ -488,15 +489,15 @@ export function LoginView() {
         </div>
 
         {mode === 'form' && !setupRequired && (
-          <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-4 text-xs text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
+          <div className="mt-4 rounded-xl border border-brand-200 bg-brand-50 p-4 text-xs text-brand-900 dark:border-brand-900 dark:bg-brand-950/40 dark:text-brand-100">
             <p className="font-semibold">Just want to try it? Use the demo account</p>
             <dl className="mt-2 space-y-1">
               <div className="flex flex-wrap gap-x-2">
-                <dt className="text-blue-700 dark:text-blue-300">Email:</dt>
+                <dt className="text-brand-700 dark:text-brand-300">Email:</dt>
                 <dd className="break-all font-mono select-all">{DEMO_ACCOUNT.email}</dd>
               </div>
               <div className="flex flex-wrap gap-x-2">
-                <dt className="text-blue-700 dark:text-blue-300">Password:</dt>
+                <dt className="text-brand-700 dark:text-brand-300">Password:</dt>
                 <dd className="font-mono select-all">{DEMO_ACCOUNT.password}</dd>
               </div>
             </dl>

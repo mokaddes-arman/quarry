@@ -30,6 +30,7 @@ import {
   GlobeIcon,
 } from './icons';
 import { formatNumber, formatRelative } from '../lib/format';
+import { LogoMark, Wordmark } from './Logo';
 
 const NAV = [
   { id: 'chat', label: 'Chat', icon: ChatIcon },
@@ -201,7 +202,7 @@ function ConversationList() {
               className={cn(
                 'group flex items-center gap-1 rounded-md px-2 py-1.5 text-left',
                 active
-                  ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-200'
+                  ? 'bg-brand-50 text-brand-700 dark:bg-brand-950/50 dark:text-brand-200'
                   : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
               )}
             >
@@ -393,14 +394,12 @@ export function Sidebar() {
       >
         {/* Identity */}
         <div className="flex items-center gap-2 border-b border-slate-200 px-3 py-3 dark:border-slate-800">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white">
-            GS
-          </div>
+          <LogoMark size={32} className="shrink-0" />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
-              Global Softel RAG
+            <p className="truncate text-base leading-tight text-slate-800 dark:text-slate-100">
+              <Wordmark />
             </p>
-            <p className="truncate text-[11px] text-slate-400">Grounded documentation chat</p>
+            <p className="truncate text-[11px] text-slate-400">Answers from your own documents</p>
           </div>
           <button
             type="button"
@@ -430,7 +429,7 @@ export function Sidebar() {
             <button
               type="button"
               onClick={() => setNewProjectOpen(true)}
-              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/40"
+              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-brand-600 hover:bg-brand-50 dark:text-brand-300 dark:hover:bg-brand-950/40"
             >
               <PlusIcon className="h-3 w-3" /> New
             </button>
@@ -485,7 +484,7 @@ export function Sidebar() {
                 <Icon className="h-4 w-4" />
                 {item.label}
                 {item.id === 'admin' && (
-                  <span className="ml-auto rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+                  <span className="ml-auto rounded bg-brand-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-brand-700 dark:bg-brand-950/60 dark:text-brand-300">
                     Admin
                   </span>
                 )}

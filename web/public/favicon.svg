@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <title>Quarry</title>
+  <rect width="64" height="64" rx="14" fill="#2F5D62"/>
+  <path d="M11 27 20 14h24l9 13z" fill="#D9A441"/>
+  <path d="M20 14h8l-4 13H11z" fill="#EBC77F"/>
+  <path d="M11 27h42L26 52z" fill="#F5F3EE"/>
+  <path d="M31 27h22L26 52z" fill="#CFC8B8"/>
+</svg>

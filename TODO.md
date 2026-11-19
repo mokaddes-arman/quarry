@@ -1,4 +1,4 @@
-# Global Softel RAG Chat — Implementation Checklist
+# Quarry — Implementation Checklist
 
 Status legend: [x] done · [~] in progress · [ ] not started
 

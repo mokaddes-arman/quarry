@@ -24,8 +24,8 @@ const AppContext = createContext(null);
 // updates on every token, and only the chat view needs to re-render for that.
 const AskContext = createContext(null);
 
-const THEME_KEY = 'rag.theme';
-const PROJECT_KEY = 'rag.activeProjectId';
+const THEME_KEY = 'quarry.theme';
+const PROJECT_KEY = 'quarry.activeProjectId';
 
 function prefersDark() {
   return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;

@@ -83,7 +83,7 @@ function BucketChart({ buckets }) {
           </span>
           <div className="h-4 min-w-0 flex-1 overflow-hidden rounded bg-slate-100 dark:bg-slate-800">
             <div
-              className="h-full rounded bg-blue-500/80"
+              className="h-full rounded bg-brand-500/80"
               style={{ width: `${Math.max(2, Math.round((b.totalTokens / max) * 100))}%` }}
               title={`${formatNumber(b.totalTokens)} tokens · ${formatNumber(b.requests)} requests`}
             />
@@ -192,7 +192,7 @@ export function ModelUsageView() {
                     className={cn(
                       'rounded-md border px-2.5 py-1 text-xs font-medium',
                       preset === p.id
-                        ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-200'
+                        ? 'border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-950/50 dark:text-brand-200'
                         : 'border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800',
                     )}
                   >

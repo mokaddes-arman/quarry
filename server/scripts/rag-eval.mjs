@@ -103,7 +103,7 @@ function sourcesText(sources) {
 }
 
 async function main() {
-  console.log('\nGlobal Softel RAG Chat — retrieval evaluation\n');
+  console.log('\nQuarry — retrieval evaluation\n');
   ensureRuntimeDirs();
   await initDb();
   await migrate();

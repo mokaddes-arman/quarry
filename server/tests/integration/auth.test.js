@@ -23,7 +23,7 @@ async function createUser({ email = EMAIL, role = 'user', status = 'invited' } =
   return h.createTestUser({ email, name: 'Person', role, status });
 }
 
-function readCookie(res, name = 'gs_session') {
+function readCookie(res, name = 'quarry_session') {
   const cookies = res.headers['set-cookie'] || [];
   for (const cookie of cookies) {
     const [pair] = String(cookie).split(';');
@@ -75,7 +75,7 @@ describe('session authentication', () => {
     const cookie = readCookie(verify);
     expect(cookie).toBeTruthy();
 
-    const me = await request(app).get('/api/auth/me').set('Cookie', `gs_session=${cookie}`).expect(200);
+    const me = await request(app).get('/api/auth/me').set('Cookie', `quarry_session=${cookie}`).expect(200);
     expect(me.body.user.id).toBe(user.id);
 
     // Replaying the same link must fail.
@@ -135,8 +135,8 @@ describe('session authentication', () => {
     const verify = await request(app).post('/api/auth/verify').send({ token: link.token }).expect(200);
     const cookie = readCookie(verify);
 
-    await request(app).post('/api/auth/logout').set('Cookie', `gs_session=${cookie}`).expect(200);
-    await request(app).get('/api/auth/me').set('Cookie', `gs_session=${cookie}`).expect(401);
+    await request(app).post('/api/auth/logout').set('Cookie', `quarry_session=${cookie}`).expect(200);
+    await request(app).get('/api/auth/me').set('Cookie', `quarry_session=${cookie}`).expect(401);
   });
 
   it('blocks first-run setup once an account exists', async () => {
@@ -187,7 +187,7 @@ describe('password authentication', () => {
       .expect(200);
     const cookie = readCookie(login);
     expect(cookie).toBeTruthy();
-    await request(app).get('/api/auth/me').set('Cookie', `gs_session=${cookie}`).expect(200);
+    await request(app).get('/api/auth/me').set('Cookie', `quarry_session=${cookie}`).expect(200);
   });
 
   it('rejects a wrong password with the same message as an unknown address', async () => {
@@ -235,7 +235,7 @@ describe('password authentication', () => {
     const admin = await createUser({ email: 'reset-admin@test.local', role: 'admin', status: 'active' });
     const adminLink = await users.issueLoginToken({ userId: admin.id });
     const adminVerify = await request(app).post('/api/auth/verify').send({ token: adminLink.token }).expect(200);
-    const adminCookie = `gs_session=${readCookie(adminVerify)}`;
+    const adminCookie = `quarry_session=${readCookie(adminVerify)}`;
 
     const target = await createUser({ email: 'reset-target@test.local', status: 'invited' });
     const invite = await users.issueLoginToken({ userId: target.id, purpose: 'invite' });
@@ -271,13 +271,13 @@ describe('administrator user management', () => {
   async function adminCookie() {
     const link = await users.issueLoginToken({ userId: h.TEST_ADMIN_ID });
     const res = await request(app).post('/api/auth/verify').send({ token: link.token }).expect(200);
-    return `gs_session=${readCookie(res)}`;
+    return `quarry_session=${readCookie(res)}`;
   }
 
   async function userCookie(user) {
     const link = await users.issueLoginToken({ userId: user.id });
     const res = await request(app).post('/api/auth/verify').send({ token: link.token }).expect(200);
-    return `gs_session=${readCookie(res)}`;
+    return `quarry_session=${readCookie(res)}`;
   }
 
   it('creates an account whose one-time link signs the new user in', async () => {

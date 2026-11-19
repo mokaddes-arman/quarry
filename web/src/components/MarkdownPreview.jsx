@@ -104,7 +104,7 @@ export function MarkdownPreview({ documentId, versionId, onClose }) {
               href={data.sourceUrl}
               target="_blank"
               rel="noreferrer noopener"
-              className="block truncate text-xs text-blue-600 hover:underline dark:text-blue-400"
+              className="block truncate text-xs text-brand-600 hover:underline dark:text-brand-300"
             >
               {data.sourceUrl}
             </a>

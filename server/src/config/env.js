@@ -117,7 +117,7 @@ const config = {
     // Sign-in links are single use and short lived.
     tokenTtlMinutes: Math.max(5, int('AUTH_TOKEN_TTL_MINUTES', 30)),
     sessionDays: Math.max(1, int('AUTH_SESSION_DAYS', 14)),
-    cookieName: 'gs_session',
+    cookieName: 'quarry_session',
     // Secure cookies require HTTPS. Enabled automatically in production unless
     // explicitly overridden (some deployments terminate TLS in front of the app).
     cookieSecure: bool('COOKIE_SECURE', nodeEnv === 'production'),
@@ -133,7 +133,7 @@ const config = {
     secure: bool('SMTP_SECURE', false),
     user: str('SMTP_USER', ''),
     pass: str('SMTP_PASS', ''),
-    from: str('MAIL_FROM', 'Global Softel RAG Chat <no-reply@localhost>'),
+    from: str('MAIL_FROM', 'Quarry <no-reply@localhost>'),
     replyTo: str('MAIL_REPLY_TO', ''),
   },
 
@@ -198,7 +198,7 @@ const config = {
     maxRedirects: int('CRAWL_MAX_REDIRECTS', 5),
     maxAttempts: Math.max(1, int('CRAWL_MAX_ATTEMPTS', 3)),
     concurrency: Math.max(1, int('CRAWL_CONCURRENCY', 1)),
-    userAgent: str('CRAWL_USER_AGENT', 'GlobalSoftelRagBot/1.0 (local knowledge-base crawler)'),
+    userAgent: str('CRAWL_USER_AGENT', 'QuarryBot/1.0 (knowledge-base crawler)'),
     // Private/loopback addresses are refused by default (SSRF protection).
     // The test suite enables them so it can crawl a local fixture server.
     allowPrivateHosts: bool('CRAWL_ALLOW_PRIVATE_HOSTS', isTest),

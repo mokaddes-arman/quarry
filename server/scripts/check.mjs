@@ -35,7 +35,7 @@ const fail = (m) => {
 const info = (m) => console.log(`${tag.info} ${m}`);
 
 async function main() {
-  console.log('\nGlobal Softel RAG Chat — backend check\n');
+  console.log('\nQuarry — backend check\n');
 
   // Imported after any env is already loaded by the module itself.
   const { config, getMasterKey } = require('../src/config/env');

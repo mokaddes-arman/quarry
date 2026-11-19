@@ -1,8 +1,8 @@
 {
-  "name": "global-softel-rag-chat",
+  "name": "quarry",
   "version": "1.0.0",
   "private": true,
-  "description": "Locally hosted, project-scoped Retrieval-Augmented Generation assistant for personal engineering documentation.",
+  "description": "Quarry: ask questions of your team's documents and get answers with their sources. Locally hosted and project-scoped.",
   "workspaces": [
     "server",
     "web"
@@ -23,7 +23,8 @@
     "test:watch": "npm --workspace server run test:watch",
     "test:e2e": "playwright test",
     "eval:rag": "npm --workspace server run eval:rag",
-    "check": "npm --workspace server run check"
+    "check": "npm --workspace server run check",
+    "icons": "node scripts/build-icons.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",

@@ -68,7 +68,7 @@ router.get(
     );
 
     res.json({
-      app: { name: 'Global Softel RAG Chat', version: '1.0.0', nodeEnv: config.nodeEnv },
+      app: { name: 'Quarry', version: '1.0.0', nodeEnv: config.nodeEnv },
       viewer: { role: req.user.role },
       ...(admin
         ? {

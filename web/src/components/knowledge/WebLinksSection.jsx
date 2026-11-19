@@ -155,7 +155,7 @@ export function WebLinksSection({ projectId, links, collections, reload }) {
                         href={link.url}
                         target="_blank"
                         rel="noreferrer noopener"
-                        className="block truncate text-[11px] text-blue-600 hover:underline dark:text-blue-400"
+                        className="block truncate text-[11px] text-brand-600 hover:underline dark:text-brand-300"
                         title={link.url}
                       >
                         {link.url}

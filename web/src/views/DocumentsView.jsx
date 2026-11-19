@@ -109,7 +109,7 @@ function UploadPanel({ projectId, onUploaded }) {
         className={cn(
           'flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-6 text-center transition-colors',
           dragging
-            ? 'border-blue-400 bg-blue-50 dark:bg-blue-950/30'
+            ? 'border-brand-400 bg-brand-50 dark:bg-brand-950/30'
             : 'border-slate-300 dark:border-slate-700',
         )}
       >
@@ -263,7 +263,7 @@ function VersionsModal({ documentId, onClose, onChanged }) {
                       <div className="flex flex-wrap gap-1">
                         <a
                           href={api.fileUrl(doc.id, { versionId: v.id, download: true })}
-                          className="rounded px-1.5 py-0.5 text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/40"
+                          className="rounded px-1.5 py-0.5 text-brand-600 hover:bg-brand-50 dark:text-brand-300 dark:hover:bg-brand-950/40"
                         >
                           Download
                         </a>
@@ -504,7 +504,7 @@ export function DocumentsView() {
               className={cn(
                 'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
                 tab === t.id
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-brand-600 text-white'
                   : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
               )}
             >

@@ -1,0 +1,32 @@
+# Render Blueprint for Quarry: New -> Blueprint -> connect mokaddes-arman/quarry.
+# Values marked `sync: false` are secrets that Render asks for on first deploy.
+# See "Deploy on Render" in README.md.
+services:
+  - type: web
+    name: quarry
+    runtime: node
+    plan: free
+    branch: main
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: APP_MASTER_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: APP_PUBLIC_URL
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        sync: false

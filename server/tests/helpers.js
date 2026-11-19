@@ -191,7 +191,7 @@ function requestAs(userId) {
 }
 
 function tempFile(name, content) {
-  const p = path.join(os.tmpdir(), `rag-test-${Date.now()}-${name}`);
+  const p = path.join(os.tmpdir(), `quarry-test-${Date.now()}-${name}`);
   fs.writeFileSync(p, content);
   return p;
 }

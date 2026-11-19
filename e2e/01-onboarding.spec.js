@@ -33,9 +33,9 @@ test('app shell renders without client-side errors', async ({ page }) => {
 
   await page.goto('/');
 
-  await expect(page).toHaveTitle('Global Softel RAG Chat');
+  await expect(page).toHaveTitle('Quarry');
   // Sidebar identity.
-  await expect(page.locator('aside').getByText('Global Softel RAG', { exact: true })).toBeVisible();
+  await expect(page.locator('aside').getByText('quarry', { exact: true })).toBeVisible();
   // Primary navigation is present (disabled until a project is active).
   await expect(page.getByRole('button', { name: 'Chat' })).toBeAttached();
   await expect(page.getByRole('button', { name: 'Settings' })).toBeAttached();
@@ -46,10 +46,10 @@ test('app shell renders without client-side errors', async ({ page }) => {
 
 test('onboarding offers a first project and creates one', async ({ page }) => {
   await page.goto('/');
-  await expect(page).toHaveTitle('Global Softel RAG Chat');
+  await expect(page).toHaveTitle('Quarry');
 
   const projectName = `Onboarding ${Date.now()}`;
-  const welcome = page.getByText('Welcome to Global Softel RAG Chat');
+  const welcome = page.getByText('Welcome to Quarry');
 
   // The welcome screen only appears on a truly empty database; the sidebar "New"
   // button works in both states, so fall back to it if the list is non-empty.

@@ -21,7 +21,7 @@ import { normaliseSource } from '../lib/sources';
  * once; the returned token is stored in localStorage for this embed only.
  */
 
-const TOKEN_PREFIX = 'rag.embed.visitor.';
+const TOKEN_PREFIX = 'quarry.embed.visitor.';
 const WELCOME_TEXT =
   'Welcome to CliqCRM! Answers are grounded in documentation and include their sources.';
 const MAX_COMPOSER_HEIGHT = 96;
@@ -42,7 +42,7 @@ function logoSrcFor(config, key) {
 function requestClose() {
   if (typeof window === 'undefined') return;
   if (window.parent && window.parent !== window) {
-    window.parent.postMessage({ type: 'gs-rag-widget:close' }, '*');
+    window.parent.postMessage({ type: 'quarry-widget:close' }, '*');
   }
 }
 
@@ -50,7 +50,7 @@ const HEADER_BUTTON =
   'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white/85 transition hover:bg-white/15 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
 
 const ACTION_FOCUS =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950';
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950';
 
 function MoreIcon() {
   return (
@@ -96,7 +96,7 @@ function CloseIcon() {
 
 function WidgetFrame({ children }) {
   return (
-    <div className="gs-rag-widget flex h-full min-h-0 flex-col overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+    <div className="quarry-widget flex h-full min-h-0 flex-col overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       {children}
     </div>
   );
@@ -128,7 +128,7 @@ function WidgetHeader({
   return (
     <header
       className="relative z-20 flex shrink-0 items-center gap-2 px-3 py-2 text-white"
-      style={{ backgroundColor: config.themeColor || '#2563eb' }}
+      style={{ backgroundColor: config.themeColor || '#2F5D62' }}
     >
       {logo ? (
         <img
@@ -214,7 +214,7 @@ function TypingIndicator() {
         {[0, 160, 320].map((delay) => (
           <span
             key={delay}
-            className="gs-typing-dot h-1.5 w-1.5 rounded-full bg-slate-400 dark:bg-slate-500"
+            className="quarry-typing-dot h-1.5 w-1.5 rounded-full bg-slate-400 dark:bg-slate-500"
             style={{ animationDelay: `${delay}ms` }}
           />
         ))}
@@ -266,7 +266,7 @@ function VisitorForm({ config, embedKey, onRegistered, notice }) {
   useEffect(() => {
     const handleMessage = (event) => {
       if (event.source !== window.parent) return;
-      if (event.data?.type === 'gs-rag-widget:focus') nameRef.current?.focus();
+      if (event.data?.type === 'quarry-widget:focus') nameRef.current?.focus();
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
@@ -333,7 +333,7 @@ function VisitorForm({ config, embedKey, onRegistered, notice }) {
                 target="_blank"
                 rel="noreferrer noopener"
                 className="mt-1 inline-block text-xs font-medium underline"
-                style={{ color: config.themeColor || '#2563eb' }}
+                style={{ color: config.themeColor || '#2F5D62' }}
               >
                 Read the privacy policy
               </a>
@@ -373,7 +373,7 @@ function VisitorForm({ config, embedKey, onRegistered, notice }) {
                 type="checkbox"
                 checked={consent}
                 onChange={(e) => setConsent(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900"
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-900"
               />
               <span>I agree to the consent notice and to my conversation being stored for review.</span>
             </label>
@@ -407,7 +407,7 @@ function MessageBubble({ message, sources, accent }) {
     return (
       <div className="flex justify-end">
         <div
-          className="gs-rag-bubble max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm px-3 py-2 text-sm text-white shadow-sm"
+          className="quarry-bubble max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm px-3 py-2 text-sm text-white shadow-sm"
           style={{ backgroundColor: accent }}
         >
           {message.content}
@@ -418,7 +418,7 @@ function MessageBubble({ message, sources, accent }) {
 
   return (
     <div className="flex justify-start">
-      <div className="gs-rag-bubble w-full max-w-[92%] min-w-0 rounded-2xl rounded-bl-sm border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="quarry-bubble w-full max-w-[92%] min-w-0 rounded-2xl rounded-bl-sm border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {message.content ? <Markdown>{message.content}</Markdown> : null}
         <SourceBadgeList sources={sources} />
       </div>
@@ -450,7 +450,7 @@ function ChatPane({
   const composerRef = useRef(null);
   const controllerRef = useRef(null);
 
-  const accent = config.themeColor || '#2563eb';
+  const accent = config.themeColor || '#2F5D62';
 
   const sourcesByMessage = useMemo(() => {
     const map = new Map();
@@ -472,7 +472,7 @@ function ChatPane({
       !configured || configured === WELCOME_TEXT
         ? WELCOME_TEXT
         : `${WELCOME_TEXT}\n\n${configured}`;
-    return { id: 'gs-welcome-message', role: 'assistant', content };
+    return { id: 'quarry-welcome-message', role: 'assistant', content };
   }, [config.welcomeMessage]);
 
   const allMessages = useMemo(() => [welcomeMessage, ...messages], [welcomeMessage, messages]);
@@ -500,7 +500,7 @@ function ChatPane({
   useEffect(() => {
     const handleMessage = (event) => {
       if (event.source !== window.parent) return;
-      if (event.data?.type === 'gs-rag-widget:focus') composerRef.current?.focus();
+      if (event.data?.type === 'quarry-widget:focus') composerRef.current?.focus();
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
@@ -631,7 +631,7 @@ function ChatPane({
 
       <div
         ref={scrollRef}
-        className="gs-rag-messages min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3"
+        className="quarry-messages min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3"
       >
         {allMessages.map((message) => (
           <MessageBubble
@@ -706,7 +706,7 @@ function ChatPane({
           </Button>
         </div>
         <p className="mt-1 text-center text-[10px] text-slate-400">
-          Powered by Global Softel RAG · answers may be imperfect, check the sources.
+          Powered by Quarry · answers may be imperfect, check the sources.
         </p>
       </div>
 
@@ -812,7 +812,7 @@ export function PublicEmbedView({ embedKey }) {
 
   if (loading) {
     return (
-      <div className="gs-rag-widget flex h-full items-center justify-center bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+      <div className="quarry-widget flex h-full items-center justify-center bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
         <div className="flex flex-col items-center gap-2">
           <Spinner className="h-5 w-5" />
           <p className="text-xs">Loading chat…</p>
@@ -823,7 +823,7 @@ export function PublicEmbedView({ embedKey }) {
 
   if (error || !config) {
     return (
-      <div className="gs-rag-widget flex h-full items-center justify-center bg-slate-50 p-5 text-center dark:bg-slate-900">
+      <div className="quarry-widget flex h-full items-center justify-center bg-slate-50 p-5 text-center dark:bg-slate-900">
         <div>
           <AlertIcon className="mx-auto h-8 w-8 text-amber-500" />
           <h1 className="mt-2 text-sm font-semibold">Chat unavailable</h1>

@@ -39,7 +39,7 @@ function emptyForm(projectId) {
     brandName: '',
     slogan: '',
     logoUrl: '',
-    themeColor: '#2563eb',
+    themeColor: '#2F5D62',
     welcomeMessage: '',
     allowedOrigins: '',
     consentRequired: true,
@@ -61,7 +61,7 @@ function formFromEmbed(embed) {
     brandName: embed.brandName || '',
     slogan: embed.slogan || '',
     logoUrl: embed.logoUrl || '',
-    themeColor: embed.themeColor || '#2563eb',
+    themeColor: embed.themeColor || '#2F5D62',
     welcomeMessage: embed.welcomeMessage || '',
     allowedOrigins: (embed.allowedOrigins || []).join('\n'),
     consentRequired: embed.consentRequired,
@@ -257,7 +257,7 @@ export function EmbedView() {
         <header className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="flex items-center gap-2 text-xl font-semibold">
-              <GlobeIcon className="h-5 w-5 text-blue-600" /> Public chat widget
+              <GlobeIcon className="h-5 w-5 text-brand-600" /> Public chat widget
             </h1>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
               Embed a floating chat on another website. Visitors do not need an account here, but
@@ -288,7 +288,7 @@ export function EmbedView() {
             <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
               <input
                 type="checkbox"
-                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
                 checked={form.enabled}
                 onChange={(e) => update({ enabled: e.target.checked })}
               />
@@ -309,7 +309,7 @@ export function EmbedView() {
                   placeholder={activeProject.name}
                 />
               </Field>
-              <Field label="Theme colour" hint="Six-digit hex, e.g. #2563eb.">
+              <Field label="Theme colour" hint="Six-digit hex, e.g. #2F5D62.">
                 <div className="flex items-center gap-2">
                   <input
                     type="color"
@@ -422,7 +422,7 @@ export function EmbedView() {
             <label className="inline-flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
-                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
                 checked={form.consentRequired}
                 onChange={(e) => update({ consentRequired: e.target.checked })}
               />

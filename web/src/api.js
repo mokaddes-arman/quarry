@@ -1,4 +1,4 @@
-// Thin API client for the Global Softel RAG Chat backend.
+// Thin API client for the Quarry backend.
 // The dev server proxies /api to the backend, so a relative base always works.
 
 const BASE = '/api';

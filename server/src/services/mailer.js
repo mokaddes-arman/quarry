@@ -62,13 +62,13 @@ async function sendLoginLink({ to, name, url, expiresAt, purpose = 'login' }) {
   const greeting = name ? `Hello ${name},` : 'Hello,';
   const intro =
     purpose === 'invite'
-      ? 'An account has been created for you on Global Softel RAG Chat.'
-      : 'Here is your sign-in link for Global Softel RAG Chat.';
+      ? 'An account has been created for you on Quarry.'
+      : 'Here is your sign-in link for Quarry.';
 
   const subject =
     purpose === 'invite'
-      ? 'Your Global Softel RAG Chat account is ready'
-      : 'Your Global Softel RAG Chat sign-in link';
+      ? 'Your Quarry account is ready'
+      : 'Your Quarry sign-in link';
 
   const text = [
     greeting,
@@ -87,7 +87,7 @@ async function sendLoginLink({ to, name, url, expiresAt, purpose = 'login' }) {
     <p style="margin:0 0 16px;font-size:16px">${escapeHtml(greeting)}</p>
     <p style="margin:0 0 20px;font-size:15px;line-height:1.5">${escapeHtml(intro)}</p>
     <p style="margin:0 0 24px">
-      <a href="${escapeHtml(url)}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Sign in</a>
+      <a href="${escapeHtml(url)}" style="display:inline-block;background:#2F5D62;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Sign in</a>
     </p>
     <p style="margin:0 0 8px;font-size:13px;color:#475569;line-height:1.5">
       This link can be used once and expires in ${minutes} minute${minutes === 1 ? '' : 's'}.

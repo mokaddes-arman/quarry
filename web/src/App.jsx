@@ -15,6 +15,7 @@ import { EmbedView } from './views/EmbedView';
 import { PublicEmbedView } from './views/PublicEmbedView';
 import { LoginView } from './views/LoginView';
 import { readRoute } from './lib/routes';
+import { LogoMark, Wordmark } from './components/Logo';
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -74,7 +75,7 @@ function FirstProjectScreen() {
     <div className="flex h-full items-center justify-center p-6">
       <EmptyState
         icon={<PlusIcon className="h-8 w-8 text-slate-400" />}
-        title="Welcome to Global Softel RAG Chat"
+        title="Welcome to Quarry"
         description="Create a project to hold a set of documents, then ask grounded questions and get answers with verifiable citations."
         action={
           <Button onClick={() => setOpen(true)}>
@@ -150,7 +151,8 @@ function Main() {
           >
             <MenuIcon className="h-5 w-5" />
           </button>
-          <span className="truncate text-sm font-semibold">Global Softel RAG</span>
+          <LogoMark size={22} className="shrink-0" />
+          <Wordmark className="truncate text-sm" />
           {activeProject && (
             <span className="truncate text-xs text-slate-400">· {activeProject.name}</span>
           )}

@@ -123,7 +123,7 @@ async function createPostgresAdapter() {
     max: 10,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
-    application_name: 'global-softel-rag-chat',
+    application_name: 'quarry',
   };
 
   if (databaseNeedsCa(config.databaseUrl)) {

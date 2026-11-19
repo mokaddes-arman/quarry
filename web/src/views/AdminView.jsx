@@ -314,7 +314,7 @@ export function AdminView() {
         <header className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="flex items-center gap-2 text-xl font-semibold">
-              <ShieldIcon className="h-5 w-5 text-blue-600" /> Administration
+              <ShieldIcon className="h-5 w-5 text-brand-600" /> Administration
             </h1>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
               Manage who can use this workspace. Each user sees the projects they own or that you
@@ -643,14 +643,14 @@ export function AdminView() {
                       key={project.id}
                       className={cn(
                         'flex items-center gap-3 rounded-md px-2 py-2 text-sm',
-                        checked ? 'bg-blue-50 dark:bg-blue-950/30' : 'hover:bg-slate-50 dark:hover:bg-slate-800/60',
+                        checked ? 'bg-brand-50 dark:bg-brand-950/30' : 'hover:bg-slate-50 dark:hover:bg-slate-800/60',
                         project.owned ? 'cursor-default' : 'cursor-pointer',
                         busy && 'opacity-60',
                       )}
                     >
                       <input
                         type="checkbox"
-                        className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
                         checked={checked}
                         disabled={project.owned || busy}
                         onChange={(e) => toggleProject(project, e.target.checked)}

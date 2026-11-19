@@ -67,7 +67,7 @@ test('admin invites a user who signs in with a one-time link and sees only their
     await inviteePage.getByRole('button', { name: 'Set password & sign in' }).click();
 
     // First-run for this account: no projects yet, no admin navigation.
-    await expect(inviteePage.getByText('Welcome to Global Softel RAG Chat')).toBeVisible();
+    await expect(inviteePage.getByText('Welcome to Quarry')).toBeVisible();
     await expect(inviteePage.locator('aside').getByRole('button', { name: /^Admin/ })).toHaveCount(0);
     await expect(inviteePage.locator('aside').getByRole('button', { name: 'Settings' })).toHaveCount(0);
     await expect(inviteePage.locator('aside').getByRole('button', { name: 'Model usage' })).toHaveCount(0);

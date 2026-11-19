@@ -29,7 +29,7 @@ describe('projects API', () => {
   });
 
   it('lists active projects and excludes archived ones by default', async () => {
-    const project = await h.createProject('Global Softel');
+    const project = await h.createProject('Quarry Docs');
     await h.request(h.getApp()).post(`/api/projects/${project.id}/archive`).expect(200);
     const active = await h.request(h.getApp()).get('/api/projects').expect(200);
     expect(active.body.projects.map((p) => p.id)).not.toContain(project.id);

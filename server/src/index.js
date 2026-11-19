@@ -56,7 +56,7 @@ async function bootstrap() {
   const server = app.listen(config.port, config.host, () => {
     logger.info(
       { url: `http://${config.host}:${config.port}`, env: config.nodeEnv },
-      'Global Softel RAG Chat API listening',
+      'Quarry API listening',
     );
   });
 

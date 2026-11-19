@@ -18,7 +18,7 @@ export function cn(...parts) {
 
 const BUTTON_VARIANTS = {
   primary:
-    'bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-400 dark:disabled:bg-blue-900',
+    'bg-brand-600 text-white hover:bg-brand-700 disabled:bg-brand-400 dark:disabled:bg-brand-900',
   secondary:
     'bg-slate-100 text-slate-800 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700',
   danger: 'bg-red-600 text-white hover:bg-red-700 disabled:bg-red-400',
@@ -68,7 +68,7 @@ export function Button({
 
 const controlClasses =
   'w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900 outline-none ' +
-  'focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 disabled:opacity-60 ' +
+  'focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 disabled:opacity-60 ' +
   'dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500';
 
 export function Input({ className = '', ...props }) {
@@ -121,7 +121,9 @@ const BADGE_TONES = {
   green: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
   amber: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
   red: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
-  blue: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+  blue: 'bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300',
+  brand: 'bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300',
+  ochre: 'bg-ochre-300/40 text-ochre-700 dark:bg-ochre-500/15 dark:text-ochre-300',
 };
 
 export function Badge({ tone = 'slate', className = '', children }) {

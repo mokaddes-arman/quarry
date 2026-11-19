@@ -52,7 +52,7 @@ function tryVersion(cmd, args) {
   }
 }
 
-console.log('\nGlobal Softel RAG Chat — prerequisite check\n');
+console.log('\nQuarry — prerequisite check\n');
 
 // --- Node -------------------------------------------------------------------
 const nodeVersion = process.versions.node;

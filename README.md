@@ -1,6 +1,10 @@
-# Global Softel RAG Chat
+<p><img src="brand/quarry-lockup.svg" alt="Quarry" height="48"></p>
 
-A **locally hosted, project-scoped Retrieval-Augmented Generation assistant** for teams
+# Quarry
+
+*Dig the answer out of what you already have.*
+
+Quarry is a **locally hosted, project-scoped Retrieval-Augmented Generation assistant** for teams
 that need grounded answers over their own engineering documentation — with **verifiable
 citations** and **strict per-project isolation**.
 
@@ -33,13 +37,14 @@ This is a regular (non-admin) user. Do not upload anything sensitive while signe
 1. [Requirements](#requirements)
 2. [Quick start (PowerShell)](#quick-start-powershell)
 3. [How it runs](#how-it-runs)
-4. [Configuration](#configuration)
-5. [Commands](#commands)
-6. [Testing & verification](#testing--verification)
-7. [API surface](#api-surface)
-8. [Security model](#security-model)
-9. [Project layout](#project-layout)
-10. [Known limitations](#known-limitations)
+4. [Deploy on Render](#deploy-on-render)
+5. [Configuration](#configuration)
+6. [Commands](#commands)
+7. [Testing & verification](#testing--verification)
+8. [API surface](#api-surface)
+9. [Security model](#security-model)
+10. [Project layout](#project-layout)
+11. [Known limitations](#known-limitations)
 
 ---
 
@@ -169,7 +174,7 @@ user can set one from their invitation link, and anyone can request a password r
 sign-in screen. Passwords are stored only as salted scrypt hashes. The link token travels in the
 URL fragment, so it is never sent to the server or written to access logs, and it is removed
 from the address bar as soon as it is consumed. A successful sign-in sets an HttpOnly,
-`SameSite=Lax` session cookie (`gs_session`); state-changing requests additionally require a
+`SameSite=Lax` session cookie (`quarry_session`); state-changing requests additionally require a
 same-origin request. Setting or resetting a password revokes the account's other sessions.
 
 **First run.** Either set `ADMIN_EMAIL` (and optionally `ADMIN_NAME`) in `.env` - the first
@@ -308,7 +313,7 @@ Set all three Supabase Storage variables to keep uploaded documents in a private
 ```bash
 SUPABASE_URL=https://<project-ref>.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=<server-only service-role key>
-SUPABASE_STORAGE_BUCKET=rag-documents
+SUPABASE_STORAGE_BUCKET=quarry-documents
 SUPABASE_LOGO_FOLDER=external_logo
 ```
 
@@ -437,6 +442,62 @@ calendar range, and group the time-series chart by day/week/month/year.
 
 ---
 
+## Deploy on Render
+
+The repository is [github.com/mokaddes-arman/quarry](https://github.com/mokaddes-arman/quarry).
+Quarry runs on Render as a single **Web Service**. The Node server serves both the API and the
+built web app from one origin.
+
+### 1. Create the service
+
+You can use either option:
+
+- **Blueprint (recommended).** In Render choose **New → Blueprint**, connect the
+  `mokaddes-arman/quarry` repository, and Render reads [`render.yaml`](render.yaml). It asks
+  for every secret marked `sync: false`.
+- **Manual.** Choose **New → Web Service**, connect the repository and set:
+
+| Setting | Value |
+| --- | --- |
+| Runtime | Node (version comes from `engines` in `package.json`: 24.x) |
+| Branch | `main` |
+| Build command | `npm ci --include=dev && npm run build` |
+| Start command | `npm start` |
+| Health check path | `/api/health` |
+
+`--include=dev` is required. The web build uses Vite, a dev dependency, and npm skips dev
+dependencies when `NODE_ENV=production`.
+
+### 2. Environment variables
+
+| Variable | Required | Value |
+| --- | --- | --- |
+| `NODE_ENV` | yes | `production` (turns on secure cookies) |
+| `APP_MASTER_KEY` | yes | 32+ random characters. **If you reuse an existing database, use the same key as before.** Otherwise the stored provider API keys cannot be decrypted. |
+| `DATABASE_URL` | yes | Supabase or other hosted Postgres with pgvector. Render's disk is ephemeral, so the embedded PGlite database is lost on every deploy. See [Supabase / hosted Postgres](#supabase--hosted-postgres-lock-down-the-public-schema). |
+| `APP_PUBLIC_URL` | yes | The service URL, e.g. `https://quarry.onrender.com` (no trailing slash). Used in emailed links and in the widget embed snippet. |
+| `CORS_ORIGIN` | yes | The same URL as `APP_PUBLIC_URL` |
+| `ADMIN_EMAIL` / `ADMIN_NAME` | first deploy | Your email. The first administrator is created at boot and a sign-in link is printed to the Render log. |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET` | recommended | Keeps uploaded files and widget logos after redeploys. See [Supabase Storage](#supabase-storage-recommended-on-render). If you reuse an existing bucket, keep its current name. |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` | optional | Sends invitations and sign-in links by email. Without SMTP, links are shown to the administrator and printed to the log. |
+| `OPENROUTER_API_KEY` / `GROQ_API_KEY` | optional | You can also add provider keys later in **Settings → AI Providers** (stored encrypted). |
+
+All other settings have working defaults. See [Configuration](#configuration).
+
+### 3. After the first deploy
+
+1. Open the Render log, follow the printed sign-in link (or open the site and finish the
+   setup screen straight away), and set a password.
+2. Add an LLM provider key in **Settings**, if you didn't set one as an environment variable.
+3. The demo account shown on the login page exists only if you create it. Create it from
+   **Admin → Users** with the email and password listed under [Demo account](#demo-account), or
+   remove the `DEMO_ACCOUNT` block in `web/src/views/LoginView.jsx`.
+4. **Moving from an older deployment:** the session cookie is now `quarry_session`, so
+   everyone signs in again once. Websites that embed the chat widget must update the snippet
+   to the new service URL. Copy the new snippet from **Embed** in the app.
+
+---
+
 ## Configuration
 
 All configuration lives in `.env` (never committed). `.env.example` documents every value.
@@ -483,7 +544,7 @@ The knowledge base can ingest **web pages**. The crawler is deliberately conserv
 | `CRAWL_MAX_REDIRECTS` | Redirect hops allowed (each hop is re-validated). | `5` |
 | `CRAWL_MAX_ATTEMPTS` | Attempts per crawl job before it is marked failed. | `3` |
 | `CRAWL_CONCURRENCY` | Pages fetched in parallel by the crawl worker. | `1` |
-| `CRAWL_USER_AGENT` | `User-Agent` sent with every fetch. | `GlobalSoftelRagBot/1.0 …` |
+| `CRAWL_USER_AGENT` | `User-Agent` sent with every fetch. | `QuarryBot/1.0 …` |
 | `CRAWL_ALLOW_PRIVATE_HOSTS` | Allow loopback/private/link-local targets. **Off by default** (SSRF protection). | `false` |
 | `CRAWL_STALE_JOB_MS` | A "processing" crawl job older than this is orphaned and re-queued. | `300000` |
 
@@ -518,7 +579,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 # 1. Create a database and enable pgvector once:
 #    CREATE EXTENSION IF NOT EXISTS vector;
 # 2. Point the app at it in .env:
-#    DATABASE_URL=postgres://rag_user:change_me@localhost:5432/rag_chat
+#    DATABASE_URL=postgres://quarry_user:change_me@localhost:5432/quarry
 # 3. Apply migrations:
 npm run db:migrate
 ```
@@ -720,8 +781,8 @@ These are real and worth knowing before you rely on the app:
 5. **The retrieval eval ships with an offline hash-embedding run.** It is a wiring/grounding
    regression check over a tiny corpus, not a benchmark of your production model.
 6. **The working tree was not under version control until now.** The folder had no git
-   repository, so early changes lived uncommitted on disk. It is now a git repository on the
-   `global-softel` branch.
+   repository, so early changes lived uncommitted on disk. It is now a git repository, hosted at
+[github.com/mokaddes-arman/quarry](https://github.com/mokaddes-arman/quarry) (`main` branch).
 7. **Scanned PDFs (image-only) are not OCR'd.** If a PDF has almost no selectable text the
    parser records an `ocrLikely` warning and the document is ingested with little or no
    searchable content. See [Scanned PDFs](#scanned-pdfs) below.

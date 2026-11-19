@@ -47,7 +47,7 @@ module.exports = async function globalSetup() {
       {
         cookies: [
           {
-            name: 'gs_session',
+            name: 'quarry_session',
             value: session.token,
             domain: '127.0.0.1',
             path: '/',

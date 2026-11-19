@@ -36,7 +36,7 @@ function session() {
 }
 
 function authHeaders() {
-  return { cookie: `gs_session=${session().token}` };
+  return { cookie: `quarry_session=${session().token}` };
 }
 
 async function api(pathname, { method = 'GET', body } = {}) {
@@ -91,7 +91,7 @@ function sessionCookieFrom(response) {
       : [response.headers.get('set-cookie')].filter(Boolean);
   return combined
     .map((value) => String(value).split(';')[0])
-    .find((value) => value.startsWith('gs_session='));
+    .find((value) => value.startsWith('quarry_session='));
 }
 
 /**
