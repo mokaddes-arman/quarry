@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <title>Quarry — Answers from your own documents</title>
+  <rect width="1200" height="630" fill="#F5F3ED"/>
+  <!-- Mark (brand/quarry-mark.svg scaled 64 -> 192) -->
+  <g transform="translate(100 150) scale(3)">
+    <rect width="64" height="64" rx="14" fill="#172A3A"/>
+    <path d="M11 27 20 14h24l9 13z" fill="#C49A5A"/>
+    <path d="M20 14h8l-4 13H11z" fill="#D4B381"/>
+    <path d="M11 27h42L26 52z" fill="#F5F3ED"/>
+    <path d="M31 27h22L26 52z" fill="#D9D3C5"/>
+  </g>
+  <text x="336" y="282" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-size="132" font-weight="600" letter-spacing="-4" fill="#172A3A">quarry</text>
+  <text x="100" y="440" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-size="46" font-weight="600" fill="#172A3A">Answers from your own documents.</text>
+  <text x="100" y="500" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-size="32" fill="#56657A">Every answer shows the page it came from.</text>
+  <rect x="0" y="606" width="1200" height="24" fill="#172A3A"/>
+  <rect x="0" y="606" width="320" height="24" fill="#C49A5A"/>
+</svg>

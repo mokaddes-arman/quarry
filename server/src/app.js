@@ -9,6 +9,7 @@ const { config } = require('./config/env');
 const { logger } = require('./lib/logger');
 const { requestContext } = require('./middleware/requestContext');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
+const { publicOrigin, absolutizeMeta } = require('./lib/indexHtml');
 const { authenticate, requireAuth, csrfGuard } = require('./middleware/auth');
 
 const authRoutes = require('./routes/auth');
@@ -112,9 +113,17 @@ function createApp({ testAuth = false, testAuthUserId = null } = {}) {
   const distDir = path.resolve(config.projectRoot, 'web', 'dist');
   if (fs.existsSync(path.join(distDir, 'index.html'))) {
     app.use(express.static(distDir, { index: false, maxAge: '1h' }));
-    app.use((req, res, next) => {
+    // Read per request (it is small) so a rebuild while the server runs is
+    // picked up, as sendFile did before.
+    app.use(async (req, res, next) => {
       if (req.method !== 'GET' || req.path.startsWith('/api')) return next();
-      return res.sendFile(path.join(distDir, 'index.html'));
+      try {
+        const html = await fs.promises.readFile(path.join(distDir, 'index.html'), 'utf8');
+        res.set('Cache-Control', 'no-cache');
+        return res.type('html').send(absolutizeMeta(html, publicOrigin(req, config.appPublicUrl)));
+      } catch (err) {
+        return next(err);
+      }
     });
     logger.info({ distDir }, 'serving built frontend');
   }

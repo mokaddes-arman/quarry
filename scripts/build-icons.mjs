@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Renders the Quarry mark (brand/quarry-mark.svg) into the raster icons the
 // web app ships: PNG app icons, an apple-touch-icon, and a multi-size
-// favicon.ico. Uses the Chromium that @playwright/test already installs, so
+// favicon.ico. Also renders brand/quarry-og.svg into the link-preview card. Uses the Chromium that @playwright/test already installs, so
 // no image-processing dependency is needed.
 //
 //   npm run icons
@@ -21,15 +21,15 @@ const PNG_TARGETS = [
 ];
 const ICO_SIZES = [16, 32, 48];
 
-async function render(page, svg, size) {
-  await page.setViewportSize({ width: size, height: size });
+async function render(page, svg, size, height = size) {
+  await page.setViewportSize({ width: size, height });
   await page.setContent(
     `<!doctype html><html><body style="margin:0;background:transparent">` +
       `<img src="data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}" ` +
-      `width="${size}" height="${size}" style="display:block"></body></html>`,
+      `width="${size}" height="${height}" style="display:block"></body></html>`,
   );
   await page.waitForFunction(() => document.images[0]?.complete);
-  return page.screenshot({ omitBackground: true, clip: { x: 0, y: 0, width: size, height: size } });
+  return page.screenshot({ omitBackground: true, clip: { x: 0, y: 0, width: size, height } });
 }
 
 // ICO container with PNG-encoded entries (supported by every modern browser
@@ -70,6 +70,11 @@ try {
   console.log(`  wrote web/public/favicon.ico (${ICO_SIZES.join(', ')})`);
   await copyFile(source, path.join(outDir, 'favicon.svg'));
   console.log('  wrote web/public/favicon.svg');
+  // Link-preview card for og:image / twitter:image (1200x630 is what
+  // Facebook, LinkedIn, Slack, WhatsApp and X all expect).
+  const ogSvg = await readFile(path.join(root, 'brand', 'quarry-og.svg'), 'utf8');
+  await writeFile(path.join(outDir, 'og-image.png'), await render(page, ogSvg, 1200, 630));
+  console.log('  wrote web/public/og-image.png (1200x630)');
 } finally {
   await browser.close();
 }
