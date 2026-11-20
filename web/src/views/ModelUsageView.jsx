@@ -64,7 +64,7 @@ const GRANULARITIES = [
 
 function SummaryCard({ label, value, sub }) {
   return (
-    <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-800">
+    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
       <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{label}</p>
       <p className="mt-1 text-lg font-semibold text-slate-800 dark:text-slate-100">{value}</p>
       {sub ? <p className="text-[11px] text-slate-400">{sub}</p> : null}
@@ -177,7 +177,7 @@ export function ModelUsageView() {
 
       <div className="space-y-5 p-4">
         {/* Filters */}
-        <section className="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+        <section className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
           <div className="flex flex-wrap items-end gap-4">
             <div>
               <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
@@ -283,7 +283,7 @@ export function ModelUsageView() {
 
             {/* Over time */}
             {data.buckets.length > 0 && (
-              <section className="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+              <section className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
                 <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Usage over time (total tokens)
                 </h2>

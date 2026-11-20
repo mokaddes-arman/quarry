@@ -562,7 +562,7 @@ export function SettingsView() {
 
       <div className="space-y-6 p-4">
         {/* System status */}
-        <section className="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+        <section className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
             System status
           </h2>
@@ -737,7 +737,7 @@ export function SettingsView() {
         </section>
 
         {/* Preferences */}
-        <section className="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+        <section className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
           <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
             <SettingsIcon className="h-3.5 w-3.5" /> Preferences
           </h2>

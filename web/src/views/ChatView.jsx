@@ -71,7 +71,7 @@ function MessageBubble({ message, sources, onRetry, streaming = false }) {
   if (isUser) {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-brand-600 px-4 py-2 text-sm text-white whitespace-pre-wrap dark:text-slate-950">
+        <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-brand-600 px-4 py-2 text-sm text-white whitespace-pre-wrap shadow-sm dark:bg-slate-800 dark:text-slate-100">
           {message.content}
         </div>
       </div>
@@ -83,10 +83,10 @@ function MessageBubble({ message, sources, onRetry, streaming = false }) {
       <div className="w-full max-w-[95%]">
         <div
           className={cn(
-            'rounded-2xl rounded-bl-sm border px-4 py-3',
+            'rounded-2xl rounded-bl-sm border px-4 py-3 shadow-sm shadow-navy/5',
             failed
               ? 'border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/40'
-              : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900',
+              : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/20',
           )}
         >
           <div className="mb-1 flex items-center gap-2 text-[11px] text-slate-400">
@@ -160,7 +160,7 @@ function Composer({ onSend, onStop, streaming, disabled }) {
   };
 
   return (
-    <div className="border-t border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
+    <div className="border-t border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-transparent">
       <div className="flex items-end gap-2">
         <Textarea
           ref={ref}
@@ -464,7 +464,7 @@ export function ChatView() {
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <header className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-4 py-2.5 dark:border-slate-800">
+      <header className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-4 py-2.5 dark:border-slate-800 dark:bg-transparent">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <h1 className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
@@ -561,7 +561,7 @@ export function ChatView() {
       </div>
 
       {/* Options + composer */}
-      <div className="border-t border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/60">
+      <div className="border-t border-slate-200 bg-page px-3 py-2 dark:border-slate-800">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-600 dark:text-slate-300">
           <label className="inline-flex items-center gap-1.5">
             <input

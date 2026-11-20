@@ -7,6 +7,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { createPortal } from 'react-dom';
 
 export function cn(...parts) {
   return parts.filter(Boolean).join(' ');
@@ -17,8 +18,10 @@ export function cn(...parts) {
 /* -------------------------------------------------------------------------- */
 
 const BUTTON_VARIANTS = {
+  // Disabled keeps its color at reduced opacity so it still reads as the main
+  // action, just not ready yet (the old grey looked broken).
   primary:
-    'bg-brand-600 text-white hover:bg-brand-700 disabled:bg-brand-400 dark:text-slate-950 dark:disabled:bg-slate-700 dark:disabled:text-slate-400',
+    'bg-brand-600 text-white shadow-sm hover:bg-brand-700 disabled:hover:bg-brand-600 dark:text-navy',
   secondary:
     'bg-slate-100 text-slate-800 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700',
   danger: 'bg-red-600 text-white hover:bg-red-700 disabled:bg-red-400',
@@ -49,7 +52,7 @@ export function Button({
       type={type}
       disabled={disabled || loading}
       className={cn(
-        'inline-flex items-center justify-center font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-70',
+        'inline-flex items-center justify-center font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50',
         BUTTON_VARIANTS[variant] || BUTTON_VARIANTS.primary,
         BUTTON_SIZES[size] || BUTTON_SIZES.md,
         className,
@@ -123,7 +126,8 @@ const BADGE_TONES = {
   red: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
   blue: 'bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300',
   brand: 'bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300',
-  brass: 'bg-brass-300/40 text-brass-700 dark:bg-brass-500/15 dark:text-brass-300',
+  // Citations: solid brass with navy text in both themes.
+  brass: 'bg-brass-500 text-navy',
 };
 
 export function Badge({ tone = 'slate', className = '', children }) {
@@ -179,11 +183,13 @@ export function Modal({ open, onClose, title, children, footer, wide = false }) 
   }, [open, onClose]);
 
   if (!open) return null;
-  return (
+  // Portal to <body> so a dialog opened from the always-dark sidebar still
+  // follows the page theme instead of inheriting the sidebar's dark scope.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:items-center">
       <div
         className={cn(
-          'w-full rounded-xl bg-white shadow-xl dark:bg-slate-900',
+          'w-full rounded-xl bg-white shadow-xl dark:border dark:border-slate-800 dark:bg-slate-900',
           wide ? 'max-w-3xl' : 'max-w-lg',
         )}
         role="dialog"
@@ -209,7 +215,8 @@ export function Modal({ open, onClose, title, children, footer, wide = false }) 
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

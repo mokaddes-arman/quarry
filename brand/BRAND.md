@@ -26,6 +26,7 @@ If the answer isn't in your documents, Quarry says so instead of guessing.
 | `quarry-mark.svg` | App icon and favicon source. A cut stone on a Deep Navy tile; its off-center point doubles as a speech-bubble tail. |
 | `quarry-mark-mono.svg` | Single-color outline (`currentColor`) for print, stamps and one-color contexts. |
 | `quarry-lockup.svg` | Mark plus wordmark for README, docs and email headers. |
+| `quarry-og.svg` | 1200×630 link-preview card (`og:image`). Rendered to `web/public/og-image.png` by `npm run icons`. |
 
 - In the app, the mark is the React component `web/src/components/Logo.jsx`. Keep its paths in sync with `quarry-mark.svg`.
 - Raster icons in `web/public/` are generated. After changing the mark, run `npm run icons`.
@@ -37,7 +38,7 @@ Four colors make up the palette. There is no teal.
 
 | Name | Hex | Role |
 |---|---|---|
-| **Deep Navy** | **`#172A3A`** | Primary: buttons, links, logo tile, body text, dark-mode surface |
+| **Deep Navy** | **`#172A3A`** | Primary: sidebar frame, buttons, links, logo tile, body text |
 | **Warm Ivory** | **`#F5F3ED`** | App background in light mode, sign-in page, logo stone |
 | **Muted Brass** | **`#C49A5A`** | Accent: citation markers, logo crown, dark-mode primary actions |
 | **Slate** | **`#718096`** | Secondary text, icons, disabled states |
@@ -73,15 +74,28 @@ Tailwind's `slate` scale is replaced in `web/src/index.css`. It runs from Warm I
 |---|---|---|---|---|
 | slate-50 | `#F5F3ED` (Warm Ivory) | | slate-600 | `#56657A` |
 | slate-100 | `#EDEAE2` | | slate-700 | `#3E4E61` |
-| slate-200 | `#E0DCD2` | | slate-800 | `#283B4C` |
-| slate-300 | `#CACBC9` | | slate-900 | `#172A3A` (Deep Navy) |
+| slate-200 | `#E6E2D8` (Sand line) | | slate-800 | `#283B4C` |
+| slate-300 | `#D6D1C4` | | slate-900 | `#172A3A` (Deep Navy) |
 | slate-400 | `#9AA4B1` | | slate-950 | `#0F1E2B` |
-| slate-500 | `#718096` (Slate) | | | |
+| slate-500 | `#637287` (secondary text) | | | |
 
 The logo's shaded facet uses `#D9D3C5`, a darker ivory used only in the mark.
+
+### Layout: Navy Frame
+A navy sidebar frames a bright work area. Brass marks the active menu item and every citation.
+
+| Token | Light | Dark | Use |
+|---|---|---|---|
+| `sidebar` | `#172A3A` | `#0B1620` | Sidebar and mobile top bar (always dark-styled: the element carries the `dark` class) |
+| `page` | `#F7F6F2` (Paper) | `#122231` | Work-area background |
+| `bg-white` / `dark:bg-slate-900` | `#FFFFFF` | `#1A2D3E` | Cards, answers, inputs, dialogs |
+| `navy` | `#172A3A` | `#172A3A` | Text on brass, in either mode |
+
+In dark mode, `slate-*` is redefined so surfaces get lighter as they rise: sidebar `#0B1620`, page `#122231`, cards `#1A2D3E` (slate-900), borders and hover `#2A3E52` (slate-800). Main text is Soft Ivory `#ECE8DE` (slate-100), secondary text `#9FABB8` (slate-400). Dialogs render through a portal so they follow the page theme, not the sidebar's.
 
 ### Rules
 - White on Deep Navy is about 14:1, and navy on brass is about 5.7:1. Both pass WCAG AA.
 - Brass-500 is a fill color. For brass text on light backgrounds use brass-700.
 - Slate `#718096` on white is about 4:1. Use it for secondary text and icons, not long body copy.
-- Brass marks **sources and citations** in light mode. Don't spend it on generic light-mode buttons.
+- Brass marks **sources, citations and the active menu item**. Citation badges are solid brass with navy text in both modes. Don't spend it on generic light-mode buttons.
+- Disabled primary buttons keep their color at 50% opacity instead of turning grey.

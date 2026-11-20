@@ -138,11 +138,11 @@ function Main() {
   else content = <ChatView />;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100">
+    <div className="flex h-screen overflow-hidden bg-page text-slate-900 dark:text-slate-100">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Mobile top bar */}
-        <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-3 py-2 lg:hidden dark:border-slate-800 dark:bg-slate-950">
+        <div className="dark flex items-center gap-2 border-b border-slate-800 bg-sidebar px-3 py-2 text-slate-100 lg:hidden">
           <button
             type="button"
             onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -179,7 +179,7 @@ export function App() {
 
   if (authLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-100 text-slate-500 dark:bg-slate-950 dark:text-slate-400">
+      <div className="flex min-h-screen items-center justify-center bg-page text-slate-500 dark:text-slate-400">
         <div className="flex flex-col items-center gap-3">
           <Spinner className="h-6 w-6" />
           <p className="text-sm">Loading workspace…</p>

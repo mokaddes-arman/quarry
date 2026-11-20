@@ -114,7 +114,7 @@ export function KnowledgeBase({ projectId, documents = [] }) {
 
 function SummaryTile({ icon, label, value, hint }) {
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-800">
+    <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
       <span className="text-slate-400">{icon}</span>
       <div className="min-w-0">
         <p className="text-xs text-slate-500">{label}</p>

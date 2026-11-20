@@ -4,16 +4,23 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* Quarry palette: Deep Navy #172A3A, Warm Ivory #F5F3ED, Muted Brass #C49A5A,
-   Slate #718096. See brand/BRAND.md. */
+   Slate #718096. Layout scheme "Navy Frame": a navy sidebar frames a bright work
+   area; brass marks citations and the active item. See brand/BRAND.md. */
 @theme {
+  /* Layout surfaces. `page` is the work-area background, `sidebar` the frame
+     around it. Both have dark-mode values below. */
+  --color-page: #f7f6f2; /* Paper */
+  --color-sidebar: #172a3a; /* Deep Navy */
+  --color-navy: #172a3a; /* Fixed navy, for text on brass in either mode */
+
   /* Neutrals (replaces Tailwind's slate): warm ivory at the light end, deep navy
      at the dark end, so every existing slate-* class picks up the palette. */
   --color-slate-50: #f5f3ed; /* Warm Ivory */
   --color-slate-100: #edeae2;
-  --color-slate-200: #e0dcd2;
-  --color-slate-300: #cacbc9;
+  --color-slate-200: #e6e2d8; /* Sand line: borders */
+  --color-slate-300: #d6d1c4;
   --color-slate-400: #9aa4b1;
-  --color-slate-500: #718096; /* Slate */
+  --color-slate-500: #637287; /* Secondary text; darker than Slate for 4.5:1 on white */
   --color-slate-600: #56657a;
   --color-slate-700: #3e4e61;
   --color-slate-800: #283b4c;
@@ -43,12 +50,38 @@
   --color-ivory: #f5f3ed;
 }
 
-/* In dark mode the surfaces are navy, so a navy primary would disappear.
-   Primary actions, focus rings and accent icons switch to brass instead. */
+/* Dark scope. Applies to the whole app in dark mode, and always to the sidebar
+   (it carries the `dark` class so it stays a navy frame in light mode too).
+
+   Surfaces get lighter as they rise: sidebar #0B1620 < page #122231 <
+   cards, inputs and dialogs (slate-900) #1A2D3E < borders and hover (slate-800).
+   Text is a soft ivory rather than pure white.
+
+   A navy primary would disappear on navy, so primary actions, focus rings and
+   accent icons switch to brass. */
 .dark {
+  --color-slate-50: #f5f3ed;
+  --color-slate-100: #ece8de; /* Soft Ivory: main text */
+  --color-slate-200: #dde1e4;
+  --color-slate-300: #c4ccd5;
+  --color-slate-400: #9fabb8; /* Secondary text */
+  --color-slate-500: #8696a8;
+  --color-slate-600: #4f657a;
+  --color-slate-700: #364d63;
+  --color-slate-800: #2a3e52; /* Borders, hover, active nav */
+  --color-slate-900: #1a2d3e; /* Raised: cards, inputs, dialogs */
+  --color-slate-950: #0b1620; /* Darkest: frame, insets */
+
   --color-brand-500: #c49a5a;
   --color-brand-600: #c49a5a;
   --color-brand-700: #d4b381;
+}
+
+/* Only the root switches the layout surfaces; the always-dark sidebar keeps the
+   light-mode Deep Navy when the rest of the app is light. */
+:root.dark {
+  --color-page: #122231;
+  --color-sidebar: #0b1620;
 }
 
 :root {
@@ -156,6 +189,14 @@ body {
 .markdown th {
   background: rgba(120, 120, 120, 0.12);
   font-weight: 600;
+}
+.markdown hr {
+  border: 0;
+  border-top: 1px solid var(--color-slate-200);
+  margin: 1rem 0;
+}
+.dark .markdown hr {
+  border-top-color: var(--color-slate-800);
 }
 .markdown blockquote {
   border-left: 3px solid rgba(120, 120, 120, 0.5);

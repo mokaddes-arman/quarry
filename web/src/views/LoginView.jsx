@@ -267,7 +267,7 @@ export function LoginView() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-ivory px-4 py-10 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+    <div className="flex min-h-screen items-center justify-center bg-page px-4 py-10 text-slate-900 dark:text-slate-100">
       <div className="w-full max-w-md">
         <div className="mb-6 flex items-center gap-3">
           <LogoMark size={44} className="shrink-0" />
@@ -489,22 +489,22 @@ export function LoginView() {
         </div>
 
         {mode === 'form' && !setupRequired && (
-          <div className="mt-4 rounded-xl border border-brand-200 bg-brand-50 p-4 text-xs text-brand-900 dark:border-brand-900 dark:bg-brand-950/40 dark:text-brand-100">
+          <div className="mt-4 rounded-xl border border-brass-300 bg-brass-300/20 p-4 text-xs text-slate-800 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
             <p className="font-semibold">Just want to try it? Use the demo account</p>
             <dl className="mt-2 space-y-1">
               <div className="flex flex-wrap gap-x-2">
-                <dt className="text-brand-700 dark:text-brand-300">Email:</dt>
+                <dt className="text-brass-700 dark:text-brass-300">Email:</dt>
                 <dd className="break-all font-mono select-all">{DEMO_ACCOUNT.email}</dd>
               </div>
               <div className="flex flex-wrap gap-x-2">
-                <dt className="text-brand-700 dark:text-brand-300">Password:</dt>
+                <dt className="text-brass-700 dark:text-brass-300">Password:</dt>
                 <dd className="font-mono select-all">{DEMO_ACCOUNT.password}</dd>
               </div>
             </dl>
             <Button
               type="button"
-              variant="secondary"
-              className="mt-3 w-full"
+              variant="outline"
+              className="mt-3 w-full bg-white dark:bg-transparent"
               onClick={signInAsDemo}
               disabled={busy}
             >

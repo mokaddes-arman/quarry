@@ -178,7 +178,7 @@ function ConversationList() {
           type="button"
           onClick={startNew}
           disabled={!activeProject}
-          className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40 dark:hover:bg-slate-800"
+          className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:text-slate-100 disabled:opacity-40 dark:hover:bg-slate-800"
           title="New conversation"
           aria-label="New conversation"
         >
@@ -202,7 +202,7 @@ function ConversationList() {
               className={cn(
                 'group flex items-center gap-1 rounded-md px-2 py-1.5 text-left',
                 active
-                  ? 'bg-brand-50 text-brand-700 dark:bg-brand-950/50 dark:text-brand-200'
+                  ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100'
                   : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
               )}
             >
@@ -273,7 +273,7 @@ function UserFooter() {
           type="button"
           onClick={signOut}
           disabled={busy}
-          className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50 dark:hover:bg-slate-800"
+          className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:text-slate-100 disabled:opacity-50 dark:hover:bg-slate-800"
           title="Sign out"
           aria-label="Sign out"
         >
@@ -388,7 +388,8 @@ export function Sidebar() {
       )}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-slate-200 bg-white transition-transform dark:border-slate-800 dark:bg-slate-950 lg:static lg:translate-x-0',
+          // `dark` keeps the sidebar a navy frame in both themes (see index.css).
+          'dark fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-slate-800 bg-sidebar text-slate-100 transition-transform lg:static lg:translate-x-0',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
@@ -404,7 +405,7 @@ export function Sidebar() {
           <button
             type="button"
             onClick={toggleTheme}
-            className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
+            className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:text-slate-100 dark:hover:bg-slate-800"
             title={dark ? 'Switch to light theme' : 'Switch to dark theme'}
             aria-label="Toggle theme"
           >
@@ -481,7 +482,7 @@ export function Sidebar() {
                     : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
                 )}
               >
-                <Icon className="h-4 w-4" />
+                <Icon className={cn('h-4 w-4', active && 'text-brass-500')} />
                 {item.label}
                 {item.id === 'admin' && (
                   <span className="ml-auto rounded bg-brand-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-brand-700 dark:bg-brand-950/60 dark:text-brand-300">
